@@ -149,17 +149,17 @@ export const generateFixtures = (teams: Team[]): Fixture[] => {
 };
 
 // --- HELPER: Calculate Ladder Logic ---
-export const updateLadderTeam = (team: Team, result: MatchResult, isHome: boolean): Team => {
+export const updateLadderTeam = (team: Team, result: MatchResult, isHome: boolean, matchType?: string): Team => {
     const won = (isHome && result.winnerId === team.id) || (!isHome && result.winnerId === team.id);
     const lost = (isHome && result.winnerId !== team.id && result.winnerId !== null) || (!isHome && result.winnerId !== team.id && result.winnerId !== null);
     const draw = result.winnerId === null;
 
     const myScore = isHome ? result.homeScore.total : result.awayScore.total;
     const oppScore = isHome ? result.awayScore.total : result.homeScore.total;
-    
+
     // DO NOT update ladder points for finals matches
-    // Only strictly check for "Finals" summary which is set only for Semi/Grand finals
-    if (result.summary === "Finals") return team;
+    // Check matchType to determine if this is a finals match (Semi Final or Grand Final)
+    if (matchType === 'Semi Final' || matchType === 'Grand Final') return team;
 
     return {
         ...team,

@@ -12,6 +12,7 @@ const Onboarding: React.FC = () => {
   const [name, setName] = useState('');
   const [position, setPosition] = useState<Position>(Position.MIDFIELDER);
   const [selectedAvatar, setSelectedAvatar] = useState<AvatarConfig>(PRESET_AVATARS[0]);
+  const [jerseyNumber, setJerseyNumber] = useState(7); // Lucky number 7 as default
   
   const [attributes, setAttributes] = useState({
     kicking: 10,
@@ -38,16 +39,23 @@ const Onboarding: React.FC = () => {
 
   const handleCreate = () => {
     if (!name) return;
-    
+
+    // Calculate initial potential based on starting attributes + room for growth
+    // Average starting attribute value
+    const avgAttribute = Object.values(attributes).reduce((sum, val) => sum + val, 0) / 7;
+    // Set potential to allow for significant growth (e.g., 25-30 points above average)
+    const calculatedPotential = Math.min(99, Math.floor(avgAttribute + 25));
+
     const newProfile: PlayerProfile = {
       name,
-      gender: 'Male', 
+      gender: 'Male',
       avatar: selectedAvatar,
       position,
       subPosition: 'GENERIC', // Will be overwritten in GameContext
       age: STARTING_AGE,
-      potential: 90,
+      potential: calculatedPotential,
       attributes,
+      jerseyNumber: jerseyNumber,
       careerStats: { matches: 0, goals: 0, behinds: 0, disposals: 0, tackles: 0, votes: 0, premierships: 0, awards: [] },
       seasonStats: { matches: 0, goals: 0, behinds: 0, disposals: 0, tackles: 0, votes: 0, premierships: 0, awards: [] },
       contract: { salary: 0, yearsLeft: 0, clubName: '', tier: LeagueTier.LOCAL },
@@ -115,6 +123,39 @@ const Onboarding: React.FC = () => {
                         >
                             {pos}
                         </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Jersey Number */}
+                <div className="shrink-0">
+                    <label className="block text-[10px] text-slate-400 mb-1 uppercase font-bold">Jersey Number</label>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setJerseyNumber(Math.max(1, jerseyNumber - 1))}
+                            className="w-12 h-12 bg-slate-800 border border-slate-700 rounded-lg font-black text-xl hover:bg-slate-700 active:scale-95 transition-all"
+                        >
+                            −
+                        </button>
+                        <div className="flex-1 bg-slate-800 border-2 border-emerald-500 rounded-lg h-12 flex items-center justify-center">
+                            <span className="text-4xl font-black text-emerald-400">{jerseyNumber}</span>
+                        </div>
+                        <button
+                            onClick={() => setJerseyNumber(Math.min(99, jerseyNumber + 1))}
+                            className="w-12 h-12 bg-slate-800 border border-slate-700 rounded-lg font-black text-xl hover:bg-slate-700 active:scale-95 transition-all"
+                        >
+                            +
+                        </button>
+                    </div>
+                    <div className="mt-1 flex gap-1 flex-wrap">
+                        {[1, 3, 7, 13, 23, 42, 69, 99].map(num => (
+                            <button
+                                key={num}
+                                onClick={() => setJerseyNumber(num)}
+                                className={`px-2 py-1 text-xs font-bold rounded transition-all ${jerseyNumber === num ? 'bg-emerald-500 text-slate-900' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                            >
+                                {num}
+                            </button>
                         ))}
                     </div>
                 </div>

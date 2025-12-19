@@ -2,15 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import Avatar from './Avatar';
+import { getEligibleNicknames, getNameBasedNicknames } from '../utils/nicknameUtils';
 
 const PlayerStatsView: React.FC = () => {
-    const { player, league, setPlayer } = useGame();
+    const { player, league, setPlayer, setView } = useGame();
 
     if (!player) return null;
     const myTeam = league.find(t => t.name === player.contract.clubName);
 
     const [bio, setBio] = useState(player.bio || "");
     const [isSavingBio, setIsSavingBio] = useState(false);
+    const [showNicknameModal, setShowNicknameModal] = useState(false);
 
     useEffect(() => {
         setBio(player.bio || "");
@@ -51,13 +53,53 @@ const PlayerStatsView: React.FC = () => {
                 <div className="w-24 h-24 rounded-full border-4 border-emerald-500 overflow-hidden">
                      <Avatar avatar={player.avatar} teamColors={myTeam?.colors} className="w-full h-full" />
                 </div>
-                <div>
-                    <h2 className="text-3xl font-black text-white italic uppercase">{player.name}</h2>
-                    <div className="flex gap-2 mt-2">
+                <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-3xl font-black text-white italic uppercase">{player.name}</h2>
+                        {player.jerseyNumber && (
+                            <div className="px-2 py-1 bg-emerald-500 text-slate-900 font-black text-xl rounded">
+                                #{player.jerseyNumber}
+                            </div>
+                        )}
+                    </div>
+                    {player.nickname && (
+                        <div className="text-sm text-emerald-400 italic font-bold mt-1">"{player.nickname}"</div>
+                    )}
+                    <div className="flex gap-2 mt-2 flex-wrap">
                         <span className="px-2 py-1 bg-emerald-900 text-emerald-400 text-xs font-bold rounded uppercase">{player.position}</span>
                         <span className="px-2 py-1 bg-slate-700 text-slate-300 text-xs font-bold rounded uppercase">Age {player.age}</span>
+                        <button
+                            onClick={() => setShowNicknameModal(true)}
+                            className="px-2 py-1 bg-purple-900 text-purple-300 text-xs font-bold rounded uppercase hover:bg-purple-800 transition-colors"
+                        >
+                            ✏️ Nickname
+                        </button>
                     </div>
                 </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+                <button
+                    onClick={() => setView('ACHIEVEMENTS')}
+                    className="py-3 bg-gradient-to-r from-yellow-600 to-orange-600 text-white font-black text-sm rounded-xl uppercase tracking-wide shadow-lg active:scale-95 transition-transform flex flex-col items-center justify-center gap-1"
+                >
+                    <span className="text-xl">🏆</span>
+                    <span className="text-xs">Achievements</span>
+                    <span className="bg-white/20 px-2 py-0.5 rounded-full text-[10px]">
+                        {player.achievements?.length || 0} / 52
+                    </span>
+                </button>
+                <button
+                    onClick={() => setView('PLAYER_COMPARISON')}
+                    className="py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-black text-sm rounded-xl uppercase tracking-wide shadow-lg active:scale-95 transition-transform flex flex-col items-center justify-center gap-1"
+                >
+                    <span className="text-xl">⚔️</span>
+                    <span className="text-xs">Compare</span>
+                    <span className="bg-white/20 px-2 py-0.5 rounded-full text-[10px]">
+                        vs League
+                    </span>
+                </button>
             </div>
 
             {/* BIO SECTION */}
@@ -111,7 +153,15 @@ const PlayerStatsView: React.FC = () => {
 
             {/* MILESTONES */}
             <div className="mb-8">
-                 <h3 className="text-xl font-black text-white italic uppercase mb-4">Milestone History</h3>
+                 <div className="flex items-center justify-between mb-4">
+                     <h3 className="text-xl font-black text-white italic uppercase">Milestone History</h3>
+                     <button
+                         onClick={() => setView('MILESTONES')}
+                         className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold rounded-lg uppercase tracking-wide hover:shadow-lg transition-all active:scale-95"
+                     >
+                         📸 Gallery
+                     </button>
+                 </div>
                  <div className="space-y-3">
                     {player.milestones && player.milestones.length > 0 ? player.milestones.map((milestone, i) => (
                         <div key={i} className="bg-yellow-900/10 border border-yellow-600/20 p-3 rounded-xl flex items-center gap-4">
@@ -165,6 +215,85 @@ const PlayerStatsView: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Nickname Selection Modal */}
+            {showNicknameModal && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 rounded-2xl border-2 border-purple-500 shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-4 text-center">
+                            <h3 className="text-xl font-black text-white uppercase">Choose Your Nickname</h3>
+                        </div>
+
+                        <div className="p-4 space-y-3">
+                            {/* Earned Nicknames */}
+                            <div>
+                                <h4 className="text-xs font-bold text-purple-400 uppercase mb-2">Earned Through Performance</h4>
+                                <div className="space-y-2">
+                                    {getEligibleNicknames(player).slice(0, 8).map((item, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => {
+                                                setPlayer(prev => prev ? { ...prev, nickname: item.nickname } : null);
+                                                setShowNicknameModal(false);
+                                            }}
+                                            className={`w-full p-3 rounded-lg text-left transition-all ${
+                                                player.nickname === item.nickname
+                                                    ? 'bg-purple-600 border-2 border-purple-400'
+                                                    : 'bg-slate-800 border border-slate-700 hover:border-purple-500'
+                                            }`}
+                                        >
+                                            <div className="font-bold text-white">{item.nickname}</div>
+                                            <div className="text-xs text-slate-400">Priority: {item.priority}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Name-based Suggestions */}
+                            <div>
+                                <h4 className="text-xs font-bold text-blue-400 uppercase mb-2">Based on Your Name</h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {getNameBasedNicknames(player.name).map((nick, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => {
+                                                setPlayer(prev => prev ? { ...prev, nickname: nick } : null);
+                                                setShowNicknameModal(false);
+                                            }}
+                                            className={`p-2 rounded-lg text-sm font-bold transition-all ${
+                                                player.nickname === nick
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-slate-800 text-slate-300 hover:bg-blue-900/50'
+                                            }`}
+                                        >
+                                            {nick}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Clear Nickname */}
+                            <button
+                                onClick={() => {
+                                    setPlayer(prev => prev ? { ...prev, nickname: undefined } : null);
+                                    setShowNicknameModal(false);
+                                }}
+                                className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:border-red-500 hover:text-red-400 transition-all"
+                            >
+                                Remove Nickname
+                            </button>
+
+                            {/* Close Button */}
+                            <button
+                                onClick={() => setShowNicknameModal(false)}
+                                className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

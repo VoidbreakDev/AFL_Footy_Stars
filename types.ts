@@ -64,28 +64,56 @@ export interface PlayerInjury {
   weeksRemaining: number;
 }
 
+export interface UnlockedAchievement {
+  achievementId: string;
+  unlockedAt: Date;
+  round: number;
+  season: number;
+}
+
+export interface DailyReward {
+  lastClaimDate: string; // ISO date string
+  streak: number;
+  totalLogins: number;
+}
+
 export interface PlayerProfile {
   name: string;
   gender: 'Male' | 'Female';
   avatar: AvatarConfig;
   position: Position;
-  subPosition: string; 
+  subPosition: string;
   age: number;
-  potential: number; 
+  potential: number;
   attributes: PlayerAttributes;
   careerStats: PlayerStats;
   seasonStats: PlayerStats;
-  milestones: Milestone[]; 
+  milestones: Milestone[];
   contract: Contract;
   xp: number;
   level: number;
   skillPoints: number;
   injury: PlayerInjury | null;
-  morale: number; 
-  energy: number; 
+  morale: number;
+  energy: number;
   rivalries: Rivalry[];
-  bio?: string; 
-  isRetired?: boolean; 
+  bio?: string;
+  isRetired?: boolean;
+
+  // New Quick Wins features
+  achievements?: UnlockedAchievement[];
+  dailyRewards?: DailyReward;
+  nickname?: string;
+  jerseyNumber?: number;
+
+  // Achievement tracking stats
+  totalSkillPointsEarned?: number;
+  trainingSessions?: number;
+  winStreak?: number;
+  injuryFreeStreak?: number;
+  highMoraleStreak?: number;
+  voteStreak?: number;
+  clubsPlayed?: string[];
 }
 
 export interface Stadium {

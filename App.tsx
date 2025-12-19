@@ -11,6 +11,9 @@ import LeagueView from './components/LeagueView';
 import PlayerStatsView from './components/PlayerStats';
 import Settings from './components/Settings';
 import CareerSummary from './components/CareerSummary';
+import Achievements from './components/Achievements';
+import MilestonesGallery from './components/MilestonesGallery';
+import PlayerComparison from './components/PlayerComparison';
 
 const ScreenSelector: React.FC = () => {
   const { view } = useGame();
@@ -32,6 +35,12 @@ const ScreenSelector: React.FC = () => {
         return <LeagueView />;
     case 'PLAYER':
         return <PlayerStatsView />;
+    case 'ACHIEVEMENTS':
+        return <Achievements />;
+    case 'MILESTONES':
+        return <MilestonesGallery />;
+    case 'PLAYER_COMPARISON':
+        return <PlayerComparison />;
     case 'SETTINGS':
         return <Settings />;
     case 'CAREER_SUMMARY':

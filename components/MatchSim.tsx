@@ -84,12 +84,27 @@ const MatchSim: React.FC = () => {
       }
   }, [myTeam, previewTeamId]);
 
+  // Cleanup intervals when component unmounts or view changes
   useEffect(() => {
       return () => {
           if (quarterIntervalRef.current) clearInterval(quarterIntervalRef.current);
           if (loadingIntervalRef.current) clearInterval(loadingIntervalRef.current);
       };
   }, []);
+
+  // Clear intervals when view changes away from match screens
+  useEffect(() => {
+      if (view !== 'MATCH_PREVIEW' && view !== 'MATCH_SIM' && view !== 'MATCH_RESULT') {
+          if (quarterIntervalRef.current) {
+              clearInterval(quarterIntervalRef.current);
+              quarterIntervalRef.current = null;
+          }
+          if (loadingIntervalRef.current) {
+              clearInterval(loadingIntervalRef.current);
+              loadingIntervalRef.current = null;
+          }
+      }
+  }, [view]);
 
   // Fake Progress Bar Logic
   useEffect(() => {

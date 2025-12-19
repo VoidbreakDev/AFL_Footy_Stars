@@ -3,16 +3,27 @@ import { useGame } from '../context/GameContext';
 import { Fixture, Milestone } from '../types';
 import { SEASON_LENGTH } from '../constants';
 import Avatar from './Avatar';
+import DailyRewardModal from './DailyRewardModal';
+import SeasonRecap from './SeasonRecap';
+import { getDailyRewardForStreak } from '../utils/dailyRewardUtils';
 
 const Dashboard: React.FC = () => {
-  const { player, currentRound, fixtures, league, setView, simulateRound, lastMatchResult, acknowledgeMilestone } = useGame();
+  const { player, currentRound, fixtures, league, setView, simulateRound, lastMatchResult, acknowledgeMilestone, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap } = useGame();
   const [showMilestone, setShowMilestone] = useState<Milestone | null>(null);
+  const [showDailyReward, setShowDailyReward] = useState(false);
 
   useEffect(() => {
     if (lastMatchResult && lastMatchResult.achievedMilestones && lastMatchResult.achievedMilestones.length > 0) {
         setShowMilestone(lastMatchResult.achievedMilestones[0]);
     }
   }, [lastMatchResult]);
+
+  // Check for daily reward on mount
+  useEffect(() => {
+    if (canClaimReward()) {
+      setShowDailyReward(true);
+    }
+  }, []);
 
   if (!player) return null;
 
@@ -224,6 +235,25 @@ const Dashboard: React.FC = () => {
                   "{lastFixture.result.summary.slice(0, 60)}..."
               </div>
           </div>
+      )}
+
+      {/* Daily Reward Modal */}
+      {showDailyReward && player && (
+        <DailyRewardModal
+          streak={player.dailyRewards?.streak || 1}
+          skillPoints={getDailyRewardForStreak(player.dailyRewards?.streak || 1).skillPoints}
+          energy={getDailyRewardForStreak(player.dailyRewards?.streak || 1).energy}
+          description={getDailyRewardForStreak(player.dailyRewards?.streak || 1).description}
+          onClaim={() => {
+            claimReward();
+            setShowDailyReward(false);
+          }}
+        />
+      )}
+
+      {/* Season Recap Modal */}
+      {showSeasonRecap && (
+        <SeasonRecap onContinue={dismissSeasonRecap} />
       )}
     </div>
   );

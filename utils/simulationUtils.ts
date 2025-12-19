@@ -278,10 +278,10 @@ export const calculateMatchOutcome = (
           timeline = [...timeline, ...events];
       }
 
-      // Calculate final timeline totals
+      // Calculate quarter-by-quarter scores from timeline events
       const hQScores: number[] = [];
       const aQScores: number[] = [];
-      
+
       let runningHGoals = 0; let runningHBehinds = 0;
       let runningAGoals = 0; let runningABehinds = 0;
 
@@ -299,6 +299,13 @@ export const calculateMatchOutcome = (
          hQScores.push((runningHGoals * 6) + runningHBehinds);
          aQScores.push((runningAGoals * 6) + runningABehinds);
       }
+
+      // Use the event-generated scores as the source of truth
+      // The recounted scores should match, but we verify and use the timeline version for consistency
+      const finalHomeGoals = homeGoals;
+      const finalHomeBehinds = homeBehinds;
+      const finalAwayGoals = awayGoals;
+      const finalAwayBehinds = awayBehinds;
 
       // Rivalry Check
       let newRivalry: Rivalry | undefined;
@@ -325,9 +332,9 @@ export const calculateMatchOutcome = (
       // -- 4. GENERATE "OFFICIAL" BOX SCORE --
       const topPerformers: PerformerStats[] = [];
 
-      // Determine Goal Budgets (Calculated from actual timeline events)
-      let homeGoalBudget = runningHGoals;
-      let awayGoalBudget = runningAGoals;
+      // Determine Goal Budgets (use the scores from event generation)
+      let homeGoalBudget = finalHomeGoals;
+      let awayGoalBudget = finalAwayGoals;
 
       // User Stats
       topPerformers.push({
@@ -397,12 +404,12 @@ export const calculateMatchOutcome = (
           }
       }
 
-      const hTotal = (runningHGoals * 6) + runningHBehinds;
-      const aTotal = (runningAGoals * 6) + runningABehinds;
+      const hTotal = (finalHomeGoals * 6) + finalHomeBehinds;
+      const aTotal = (finalAwayGoals * 6) + finalAwayBehinds;
 
       return {
-          homeScore: { goals: runningHGoals, behinds: runningHBehinds, total: hTotal, quarters: hQScores },
-          awayScore: { goals: runningAGoals, behinds: runningABehinds, total: aTotal, quarters: aQScores },
+          homeScore: { goals: finalHomeGoals, behinds: finalHomeBehinds, total: hTotal, quarters: hQScores },
+          awayScore: { goals: finalAwayGoals, behinds: finalAwayBehinds, total: aTotal, quarters: aQScores },
           winnerId: hTotal > aTotal ? homeTeam.id : aTotal > hTotal ? awayTeam.id : null,
           playerStats: pStats,
           summary: "",

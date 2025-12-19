@@ -1,9 +1,12 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { PlayerProfile, Team, Fixture, LeagueTier, Position, MatchResult, MatchEvent, Rivalry, PlayerInjury, Milestone, PerformerStats } from '../types';
-import { SEASON_LENGTH, TEAM_NAMES_LOCAL, FIRST_NAMES, LAST_NAMES, MILESTONES } from '../constants';
+import { SEASON_LENGTH, TEAM_NAMES_LOCAL, FIRST_NAMES, LAST_NAMES, MILESTONES, RETIREMENT_AGE } from '../constants';
 import { generateLeague, generateFixtures, updateLadderTeam, generateSemiFinals, generateGrandFinal } from '../utils/leagueUtils';
 import { calculateMatchOutcome, simulateCPUMatch } from '../utils/simulationUtils';
+import { checkAchievements } from '../utils/achievementUtils';
+import { canClaimDailyReward, claimDailyReward } from '../utils/dailyRewardUtils';
+import { shouldUpdateNickname, generateNickname } from '../utils/nicknameUtils';
 
 interface GameContextType {
   player: PlayerProfile | null;
@@ -17,14 +20,18 @@ interface GameContextType {
   trainAttribute: (attr: keyof PlayerProfile['attributes']) => void;
   advanceRound: () => void;
   simulateRound: () => void; // New function for injured players to skip match
-  view: 'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'SETTINGS' | 'CAREER_SUMMARY';
+  view: 'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' | 'MILESTONES' | 'PLAYER_COMPARISON' | 'SETTINGS' | 'CAREER_SUMMARY';
   setView: React.Dispatch<React.SetStateAction<any>>;
   lastMatchResult: MatchResult | null;
   saveGame: () => void;
   loadGame: () => boolean;
   acknowledgeMilestone: () => void;
-  retirePlayer: () => void; // Marks player as retired
+  retirePlayer: () => void;
+  canClaimReward: () => boolean;
+  claimReward: () => void;
   resetGame: () => void; // Wipes data for new game
+  showSeasonRecap: boolean;
+  dismissSeasonRecap: () => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -34,8 +41,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [league, setLeague] = useState<Team[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [currentRound, setCurrentRound] = useState(1);
-  const [view, setView] = useState<'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'SETTINGS' | 'CAREER_SUMMARY'>('ONBOARDING');
+  const [view, setView] = useState<'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' | 'MILESTONES' | 'PLAYER_COMPARISON' | 'SETTINGS' | 'CAREER_SUMMARY'>('ONBOARDING');
   const [lastMatchResult, setLastMatchResult] = useState<MatchResult | null>(null);
+  const [showSeasonRecap, setShowSeasonRecap] = useState(false);
 
   const startNewGame = (profile: PlayerProfile) => {
     const newLeague = generateLeague(LeagueTier.LOCAL);
@@ -95,7 +103,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const trainAttribute = (attr: keyof PlayerProfile['attributes']) => {
     if (!player) return;
-    
+
     // CAP CHECK: Cannot train if attribute is at or above potential
     if (player.attributes[attr] >= player.potential) return;
     // ENERGY CHECK: Cannot train if energy is too low
@@ -108,6 +116,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ...prev,
                 skillPoints: prev.skillPoints - 1,
                 energy: prev.energy - 10,
+                trainingSessions: (prev.trainingSessions || 0) + 1,
                 attributes: {
                     ...prev.attributes,
                     [attr]: prev.attributes[attr] + 1
@@ -231,8 +240,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Helper to find team in local league array and update
       // NOTE: If it's a Finals match, we do NOT update Ladder Points (updateLadderTeam handles this check inside)
       updatedLeague = updatedLeague.map(t => {
-          if (t.id === fixture.homeTeamId) return updateLadderTeam(t, resultWithMilestones, true);
-          if (t.id === fixture.awayTeamId) return updateLadderTeam(t, resultWithMilestones, false);
+          if (t.id === fixture.homeTeamId) return updateLadderTeam(t, resultWithMilestones, true, fixture.matchType);
+          if (t.id === fixture.awayTeamId) return updateLadderTeam(t, resultWithMilestones, false, fixture.matchType);
           return t;
       });
 
@@ -245,24 +254,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       otherFixturesIndices.forEach(otherFix => {
           const home = updatedLeague.find(t => t.id === otherFix.homeTeamId);
           const away = updatedLeague.find(t => t.id === otherFix.awayTeamId);
-          
-          if (home && away) {
-              const simResult = simulateCPUMatch(home, away);
-              
-              // Only tag as Finals if EXPLICITLY set to Semi or Grand Final
-              // Regular matches have matchType='League', which is truthy, but we MUST update ladder for them
-              if (otherFix.matchType === 'Semi Final' || otherFix.matchType === 'Grand Final') {
-                  simResult.summary = "Finals"; 
-              }
-              
-              updatedFixtures[otherFix.originalIndex] = { ...updatedFixtures[otherFix.originalIndex], played: true, result: simResult };
-              
-              updatedLeague = updatedLeague.map(t => {
-                if (t.id === otherFix.homeTeamId) return updateLadderTeam(t, simResult, true);
-                if (t.id === otherFix.awayTeamId) return updateLadderTeam(t, simResult, false);
-                return t;
-              });
+
+          if (!home || !away) {
+              console.error(`Cannot simulate other match: Teams not found (Home: ${otherFix.homeTeamId}, Away: ${otherFix.awayTeamId})`);
+              return;
           }
+
+          const simResult = simulateCPUMatch(home, away);
+
+          updatedFixtures[otherFix.originalIndex] = { ...updatedFixtures[otherFix.originalIndex], played: true, result: simResult };
+
+          updatedLeague = updatedLeague.map(t => {
+              if (t.id === otherFix.homeTeamId) return updateLadderTeam(t, simResult, true, otherFix.matchType);
+              if (t.id === otherFix.awayTeamId) return updateLadderTeam(t, simResult, false, otherFix.matchType);
+              return t;
+          });
       });
 
       setFixtures(updatedFixtures);
@@ -281,7 +287,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (achievedMilestones.length > 0) {
               updatedMilestones.push(...achievedMilestones);
           }
-          
+
           // Clamp Morale
           const newMorale = Math.min(100, Math.max(0, prev.morale + moraleChange));
 
@@ -292,14 +298,32 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               newPotential = Math.min(99, prev.potential + 1);
           }
 
-          return {
+          // Update tracking stats for achievements
+          const won = myScore > oppScore;
+          const newWinStreak = won ? (prev.winStreak || 0) + 1 : 0;
+          const newInjuryFreeStreak = result.playerInjury ? 0 : (prev.injuryFreeStreak || 0) + 1;
+          const newHighMoraleStreak = newMorale >= 90 ? (prev.highMoraleStreak || 0) + 1 : 0;
+          const newVoteStreak = result.playerStats.votes > 0 ? (prev.voteStreak || 0) + 1 : 0;
+          const totalSPEarned = (prev.totalSkillPointsEarned || 0) + 1;
+
+          // Track clubs played
+          const clubsPlayed = prev.clubsPlayed || [prev.contract.clubName];
+
+          // Create updated player for achievement checking
+          const updatedPlayer: PlayerProfile = {
               ...prev,
               potential: newPotential,
               morale: newMorale,
               skillPoints: prev.skillPoints + 1,
               rivalries: updatedRivalries,
               milestones: updatedMilestones,
-              injury: result.playerInjury || prev.injury, // Set new injury if occurred
+              injury: result.playerInjury || prev.injury,
+              totalSkillPointsEarned: totalSPEarned,
+              winStreak: newWinStreak,
+              injuryFreeStreak: newInjuryFreeStreak,
+              highMoraleStreak: newHighMoraleStreak,
+              voteStreak: newVoteStreak,
+              clubsPlayed,
               seasonStats: {
                   ...prev.seasonStats,
                   matches: prev.seasonStats.matches + 1,
@@ -316,7 +340,23 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   votes: prev.careerStats.votes + result.playerStats.votes,
                   tackles: prev.careerStats.tackles + result.playerStats.tackles
               }
+          };
+
+          // Check for new achievements
+          const newAchievements = checkAchievements(updatedPlayer, currentRound, 1, result);
+          const existingAchievements = prev.achievements || [];
+
+          // Check if nickname should be updated based on new performance
+          let updatedNickname = updatedPlayer.nickname;
+          if (shouldUpdateNickname(updatedPlayer)) {
+              updatedNickname = generateNickname(updatedPlayer);
           }
+
+          return {
+              ...updatedPlayer,
+              nickname: updatedNickname,
+              achievements: [...existingAchievements, ...newAchievements]
+          };
       });
   };
 
@@ -339,7 +379,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setFixtures(nextFixtures);
       setCurrentRound(nextRound);
-      
+
+      // Check if season has ended (after Grand Final)
+      const seasonEnded = currentRound === SEASON_LENGTH + 2;
+
+      // Show season recap before processing season end
+      if (seasonEnded) {
+          setShowSeasonRecap(true);
+      }
+
       // Heal Player & Restore Energy
       setPlayer(prev => {
           if(!prev) return null;
@@ -348,8 +396,41 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const weeksLeft = prev.injury.weeksRemaining - 1;
               updatedInjury = weeksLeft <= 0 ? null : { ...prev.injury, weeksRemaining: weeksLeft };
           }
+
+          // Age increment and contract management at end of season
+          let newAge = prev.age;
+          let updatedContract = prev.contract;
+          if (seasonEnded) {
+              newAge = prev.age + 1;
+
+              // Decrement contract years
+              const newYearsLeft = Math.max(0, prev.contract.yearsLeft - 1);
+              updatedContract = {
+                  ...prev.contract,
+                  yearsLeft: newYearsLeft
+              };
+
+              // Notify player if contract is expiring
+              if (newYearsLeft === 0) {
+                  setTimeout(() => {
+                      alert(`Your contract with ${prev.contract.clubName} has expired! You may receive transfer offers.`);
+                  }, 200);
+              }
+          }
+
+          // Check for forced retirement
+          if (newAge >= RETIREMENT_AGE) {
+              // Automatically retire player
+              setTimeout(() => {
+                  alert(`You have reached retirement age (${RETIREMENT_AGE}). Your career has come to an end.`);
+                  retirePlayer();
+              }, 100);
+          }
+
           return {
               ...prev,
+              age: newAge,
+              contract: updatedContract,
               energy: 100, // Restore Energy
               injury: updatedInjury
           };
@@ -369,23 +450,24 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let updatedLeague = [...league];
 
       roundFixturesIndices.forEach(fix => {
-          const homeTeam = updatedLeague.find(t => t.id === fix.homeTeamId)!;
-          const awayTeam = updatedLeague.find(t => t.id === fix.awayTeamId)!;
-          
-          const result = simulateCPUMatch(homeTeam, awayTeam);
-          
-          // Only tag as Finals if strictly Semi or Grand Final
-          if (fix.matchType === 'Semi Final' || fix.matchType === 'Grand Final') {
-              result.summary = "Finals";
+          const homeTeam = updatedLeague.find(t => t.id === fix.homeTeamId);
+          const awayTeam = updatedLeague.find(t => t.id === fix.awayTeamId);
+
+          // Safety check: skip if teams not found
+          if (!homeTeam || !awayTeam) {
+              console.error(`Cannot simulate match: Teams not found (Home: ${fix.homeTeamId}, Away: ${fix.awayTeamId})`);
+              return;
           }
+
+          const result = simulateCPUMatch(homeTeam, awayTeam);
 
           // Update Fixture
           newFixtures[fix.index] = { ...newFixtures[fix.index], played: true, result };
 
           // Update Ladder (Only if regular season)
           updatedLeague = updatedLeague.map(t => {
-                if (t.id === fix.homeTeamId) return updateLadderTeam(t, result, true);
-                if (t.id === fix.awayTeamId) return updateLadderTeam(t, result, false);
+                if (t.id === fix.homeTeamId) return updateLadderTeam(t, result, true, fix.matchType);
+                if (t.id === fix.awayTeamId) return updateLadderTeam(t, result, false, fix.matchType);
                 return t;
           });
       });
@@ -399,11 +481,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setFixtures(newFixtures);
       setLeague(updatedLeague);
-      
+
+      // Check if season has ended (after Grand Final)
+      const seasonEnded = currentRound === SEASON_LENGTH + 2;
+
       // Manual advance since simulateRound calls advanceRound usually, but we have custom logic inside advanceRound
       // so let's just increment round state and heal player here to avoid double-calling fixtures generation
       setCurrentRound(prev => prev + 1);
-      
+
       setPlayer(prev => {
           if(!prev) return null;
           let updatedInjury = prev.injury;
@@ -411,13 +496,46 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const weeksLeft = prev.injury.weeksRemaining - 1;
               updatedInjury = weeksLeft <= 0 ? null : { ...prev.injury, weeksRemaining: weeksLeft };
           }
+
+          // Age increment and contract management at end of season
+          let newAge = prev.age;
+          let updatedContract = prev.contract;
+          if (seasonEnded) {
+              newAge = prev.age + 1;
+
+              // Decrement contract years
+              const newYearsLeft = Math.max(0, prev.contract.yearsLeft - 1);
+              updatedContract = {
+                  ...prev.contract,
+                  yearsLeft: newYearsLeft
+              };
+
+              // Notify player if contract is expiring
+              if (newYearsLeft === 0) {
+                  setTimeout(() => {
+                      alert(`Your contract with ${prev.contract.clubName} has expired! You may receive transfer offers.`);
+                  }, 200);
+              }
+          }
+
+          // Check for forced retirement
+          if (newAge >= RETIREMENT_AGE) {
+              // Automatically retire player
+              setTimeout(() => {
+                  alert(`You have reached retirement age (${RETIREMENT_AGE}). Your career has come to an end.`);
+                  retirePlayer();
+              }, 100);
+          }
+
           return {
               ...prev,
+              age: newAge,
+              contract: updatedContract,
               energy: 100, // Restore Energy
               injury: updatedInjury
           };
       });
-      
+
       setView('DASHBOARD');
   };
 
@@ -471,6 +589,48 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setView('ONBOARDING');
   };
 
+  const dismissSeasonRecap = () => {
+      setShowSeasonRecap(false);
+      // Reset season stats after recap
+      setPlayer(prev => {
+          if (!prev) return null;
+          return {
+              ...prev,
+              seasonStats: {
+                  matches: 0,
+                  goals: 0,
+                  behinds: 0,
+                  disposals: 0,
+                  tackles: 0,
+                  votes: 0,
+                  premierships: 0,
+                  awards: []
+              }
+          };
+      });
+  };
+
+  const canClaimReward = (): boolean => {
+      if (!player) return false;
+      return canClaimDailyReward(player.dailyRewards);
+  };
+
+  const claimReward = () => {
+      if (!player || !canClaimReward()) return;
+
+      const { updatedRewards, reward } = claimDailyReward(player.dailyRewards);
+
+      setPlayer(prev => {
+          if (!prev) return null;
+          return {
+              ...prev,
+              skillPoints: prev.skillPoints + reward.skillPoints,
+              energy: Math.min(100, prev.energy + reward.energy),
+              dailyRewards: updatedRewards
+          };
+      });
+  };
+
   const loadGame = () => {
     try {
       const saved = localStorage.getItem('footyLegendSave');
@@ -513,8 +673,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <GameContext.Provider value={{ 
-        player, setPlayer, league, fixtures, currentRound, startNewGame, generateMatchSimulation, commitMatchResult, trainAttribute, advanceRound, simulateRound, view, setView, lastMatchResult, saveGame, loadGame, acknowledgeMilestone, retirePlayer, resetGame
+    <GameContext.Provider value={{
+        player, setPlayer, league, fixtures, currentRound, startNewGame, generateMatchSimulation, commitMatchResult, trainAttribute, advanceRound, simulateRound, view, setView, lastMatchResult, saveGame, loadGame, acknowledgeMilestone, retirePlayer, resetGame, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap
     }}>
       {children}
     </GameContext.Provider>
