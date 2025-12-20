@@ -14,9 +14,16 @@ import CareerSummary from './components/CareerSummary';
 import Achievements from './components/Achievements';
 import MilestonesGallery from './components/MilestonesGallery';
 import PlayerComparison from './components/PlayerComparison';
+import TransferMarket from './components/TransferMarket';
+import Shop from './components/Shop';
+import Draft from './components/Draft';
+import MediaHub from './components/MediaHub';
+import CareerEvents from './components/CareerEvents';
+import TeamChemistry from './components/TeamChemistry';
+import CoachingStaff from './components/CoachingStaff';
 
 const ScreenSelector: React.FC = () => {
-  const { view } = useGame();
+  const { view, player, draftClass, draftProspect, simulateDraft, completeDraft } = useGame();
 
   switch (view) {
     case 'ONBOARDING':
@@ -41,6 +48,29 @@ const ScreenSelector: React.FC = () => {
         return <MilestonesGallery />;
     case 'PLAYER_COMPARISON':
         return <PlayerComparison />;
+    case 'TRANSFER_MARKET':
+        return <TransferMarket />;
+    case 'SHOP':
+        return <Shop />;
+    case 'DRAFT':
+        return draftClass && player ? (
+          <Draft
+            draftClass={draftClass}
+            userTeamName={player.contract.clubName}
+            playerName={player.name}
+            onSelectProspect={draftProspect}
+            onSimulateDraft={simulateDraft}
+            onCompleteDraft={completeDraft}
+          />
+        ) : <Dashboard />;
+    case 'MEDIA_HUB':
+        return <MediaHub />;
+    case 'CAREER_EVENTS':
+        return <CareerEvents />;
+    case 'TEAM_CHEMISTRY':
+        return <TeamChemistry />;
+    case 'COACHING_STAFF':
+        return <CoachingStaff />;
     case 'SETTINGS':
         return <Settings />;
     case 'CAREER_SUMMARY':

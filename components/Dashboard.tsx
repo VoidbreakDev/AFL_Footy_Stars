@@ -5,10 +5,11 @@ import { SEASON_LENGTH } from '../constants';
 import Avatar from './Avatar';
 import DailyRewardModal from './DailyRewardModal';
 import SeasonRecap from './SeasonRecap';
+import AwardsCeremony from './AwardsCeremony';
 import { getDailyRewardForStreak } from '../utils/dailyRewardUtils';
 
 const Dashboard: React.FC = () => {
-  const { player, currentRound, fixtures, league, setView, simulateRound, lastMatchResult, acknowledgeMilestone, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap } = useGame();
+  const { player, currentRound, fixtures, league, setView, simulateRound, lastMatchResult, acknowledgeMilestone, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap, seasonAwards, dismissAwardsCeremony } = useGame();
   const [showMilestone, setShowMilestone] = useState<Milestone | null>(null);
   const [showDailyReward, setShowDailyReward] = useState(false);
 
@@ -125,6 +126,83 @@ const Dashboard: React.FC = () => {
               </div>
           </div>
       )}
+
+      {player.transferOffers && player.transferOffers.length > 0 && (
+          <button
+              onClick={() => setView('TRANSFER_MARKET')}
+              className="w-full bg-gradient-to-r from-purple-900/40 to-blue-900/40 border-l-4 border-purple-500 p-4 rounded-r-xl animate-pulse shadow-lg hover:from-purple-900/60 hover:to-blue-900/60 transition-all"
+          >
+              <div className="flex items-start gap-3">
+                  <div className="text-2xl">📨</div>
+                  <div className="flex-1 text-left">
+                      <h3 className="font-bold text-purple-400 uppercase text-sm">Transfer Offers</h3>
+                      <p className="text-white font-bold text-lg">{player.transferOffers.length} {player.transferOffers.length === 1 ? 'Club' : 'Clubs'} Interested</p>
+                      <p className="text-purple-300 text-sm">Tap to view offers - Some expire soon!</p>
+                  </div>
+                  <div className="text-3xl font-black text-purple-400">
+                      {player.transferOffers.length}
+                  </div>
+              </div>
+          </button>
+      )}
+
+      {/* Media Events Alert */}
+      {player.mediaReputation && player.mediaReputation.mediaEvents.filter(e => !e.hasResponded).length > 0 && (
+          <button
+              onClick={() => setView('MEDIA_HUB')}
+              className="w-full bg-gradient-to-r from-pink-900/40 to-purple-900/40 border-l-4 border-pink-500 p-4 rounded-r-xl animate-pulse shadow-lg hover:from-pink-900/60 hover:to-purple-900/60 transition-all"
+          >
+              <div className="flex items-start gap-3">
+                  <div className="text-2xl">📱</div>
+                  <div className="flex-1 text-left">
+                      <h3 className="font-bold text-pink-400 uppercase text-sm">Media Attention</h3>
+                      <p className="text-white font-bold text-lg">{player.mediaReputation.mediaEvents.filter(e => !e.hasResponded).length} Event{player.mediaReputation.mediaEvents.filter(e => !e.hasResponded).length > 1 ? 's' : ''} Need Response</p>
+                      <p className="text-pink-300 text-sm">Fans are waiting to hear from you!</p>
+                  </div>
+                  <div className="text-3xl font-black text-pink-400">
+                      ⚠️
+                  </div>
+              </div>
+          </button>
+      )}
+
+      {/* Career Events Alert */}
+      {player.activeCareerEvents && player.activeCareerEvents.length > 0 && (
+          <button
+              onClick={() => setView('CAREER_EVENTS')}
+              className="w-full bg-gradient-to-r from-purple-900/40 to-blue-900/40 border-l-4 border-purple-500 p-4 rounded-r-xl animate-pulse shadow-lg hover:from-purple-900/60 hover:to-blue-900/60 transition-all"
+          >
+              <div className="flex items-start gap-3">
+                  <div className="text-2xl">✨</div>
+                  <div className="flex-1 text-left">
+                      <h3 className="font-bold text-purple-400 uppercase text-sm">Career Event{player.activeCareerEvents.length > 1 ? 's' : ''}</h3>
+                      <p className="text-white font-bold text-lg">{player.activeCareerEvents.length} Random Encounter{player.activeCareerEvents.length > 1 ? 's' : ''}</p>
+                      <p className="text-purple-300 text-sm">Life throws something your way!</p>
+                  </div>
+                  <div className="text-3xl font-black text-purple-400">
+                      🎲
+                  </div>
+              </div>
+          </button>
+      )}
+
+      {/* Shop Banner */}
+      <button
+          onClick={() => setView('SHOP')}
+          className="w-full bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-l-4 border-green-500 p-4 rounded-r-xl shadow-lg hover:from-green-900/60 hover:to-emerald-900/60 transition-all"
+      >
+          <div className="flex items-start gap-3">
+              <div className="text-2xl">🏪</div>
+              <div className="flex-1 text-left">
+                  <h3 className="font-bold text-green-400 uppercase text-sm">The Shop</h3>
+                  <p className="text-white font-bold text-lg">${(player.wallet || 0).toLocaleString()} Available</p>
+                  <p className="text-green-300 text-sm">Buy training gear, recovery items & career boosters</p>
+              </div>
+              <div className="text-3xl font-black text-green-400">
+                  $
+              </div>
+          </div>
+      </button>
 
       <div className={`rounded-2xl border overflow-hidden shadow-xl relative ${isGrandFinal ? 'bg-gradient-to-br from-yellow-900 to-slate-900 border-yellow-500' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700'}`}>
         <div className={`absolute top-0 left-0 w-full h-1 ${isGrandFinal ? 'bg-yellow-400' : 'bg-gradient-to-r from-emerald-500 to-yellow-400'}`}></div>
@@ -254,6 +332,15 @@ const Dashboard: React.FC = () => {
       {/* Season Recap Modal */}
       {showSeasonRecap && (
         <SeasonRecap onContinue={dismissSeasonRecap} />
+      )}
+
+      {/* Awards Ceremony Modal */}
+      {seasonAwards.length > 0 && player && (
+        <AwardsCeremony
+          awards={seasonAwards}
+          playerName={player.name}
+          onDismiss={dismissAwardsCeremony}
+        />
       )}
     </div>
   );

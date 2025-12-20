@@ -7,6 +7,10 @@ export const TEAM_NAMES_LOCAL = [
   "Mudcrabs", "Bushrangers", "Magpies", "Tigers", "Blues", "Demons", "Lions", "Hawks"
 ];
 
+export const TEAM_NAMES_STATE = [
+  "Wildcats", "Scorpions", "Thunder", "Lightning", "Flames", "Cyclones", "Dragons", "Sharks"
+];
+
 export const TEAM_NAMES_AFL = [
   "Collingwood", "Carlton", "Essendon", "Richmond", "Hawthorn", "Geelong", "Sydney", "Brisbane"
 ];
@@ -159,6 +163,37 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'mr_consistent', name: 'Mr. Consistent', description: 'Earn votes in 20 consecutive matches', icon: '📊', category: 'LEGEND', rarity: 'LEGENDARY', requirement: 'vote_streak >= 20' },
 ];
 
+// --- SHOP ITEMS ---
+export const SHOP_ITEMS = [
+  // RECOVERY ITEMS
+  { id: 'energy_drink', name: 'Energy Drink', description: 'Instant +25 energy boost', price: 50, icon: '⚡', category: 'RECOVERY' as const, effect: { type: 'ENERGY' as const, value: 25 } },
+  { id: 'sports_drink', name: 'Sports Drink', description: 'Restore +50 energy', price: 100, icon: '🥤', category: 'RECOVERY' as const, effect: { type: 'ENERGY' as const, value: 50 } },
+  { id: 'recovery_session', name: 'Recovery Session', description: 'Full energy restore', price: 250, icon: '🧘', category: 'RECOVERY' as const, effect: { type: 'ENERGY' as const, value: 100 } },
+  { id: 'physio_treatment', name: 'Physio Treatment', description: 'Reduce injury by 1 week', price: 500, icon: '💆', category: 'RECOVERY' as const, effect: { type: 'INJURY_HEAL' as const, value: 1 } },
+  { id: 'surgery', name: 'Surgery', description: 'Instantly heal any injury', price: 2000, icon: '🏥', category: 'RECOVERY' as const, effect: { type: 'INJURY_HEAL' as const, value: 99 } },
+
+  // TRAINING ITEMS
+  { id: 'personal_trainer', name: 'Personal Trainer', description: '+5 skill points', price: 300, icon: '👟', category: 'TRAINING' as const, effect: { type: 'SKILL_POINTS' as const, value: 5 } },
+  { id: 'elite_coaching', name: 'Elite Coaching', description: '+10 skill points', price: 600, icon: '📋', category: 'TRAINING' as const, effect: { type: 'SKILL_POINTS' as const, value: 10 } },
+  { id: 'sports_psychologist', name: 'Sports Psychologist', description: '+30 morale boost', price: 200, icon: '🧠', category: 'TRAINING' as const, effect: { type: 'MORALE' as const, value: 30 } },
+  { id: 'motivational_speaker', name: 'Motivational Speaker', description: 'Max out morale', price: 400, icon: '🎤', category: 'TRAINING' as const, effect: { type: 'MORALE' as const, value: 100 } },
+  { id: 'xp_booster', name: 'XP Booster', description: '+500 XP instantly', price: 350, icon: '📈', category: 'TRAINING' as const, effect: { type: 'XP_BOOST' as const, value: 500 } },
+
+  // ATTRIBUTE BOOSTERS (Expensive, permanent +1 boosts)
+  { id: 'kicking_masterclass', name: 'Kicking Masterclass', description: '+1 permanent kicking', price: 1000, icon: '🦶', category: 'TRAINING' as const, effect: { type: 'ATTRIBUTE_BOOST' as const, value: 1, attribute: 'kicking' as const }, oneTime: true },
+  { id: 'handball_clinic', name: 'Handball Clinic', description: '+1 permanent handball', price: 1000, icon: '✋', category: 'TRAINING' as const, effect: { type: 'ATTRIBUTE_BOOST' as const, value: 1, attribute: 'handball' as const }, oneTime: true },
+  { id: 'tackling_workshop', name: 'Tackling Workshop', description: '+1 permanent tackling', price: 1000, icon: '🛡️', category: 'TRAINING' as const, effect: { type: 'ATTRIBUTE_BOOST' as const, value: 1, attribute: 'tackling' as const }, oneTime: true },
+  { id: 'marking_school', name: 'Marking School', description: '+1 permanent marking', price: 1000, icon: '🙌', category: 'TRAINING' as const, effect: { type: 'ATTRIBUTE_BOOST' as const, value: 1, attribute: 'marking' as const }, oneTime: true },
+  { id: 'speed_program', name: 'Speed Program', description: '+1 permanent speed', price: 1000, icon: '💨', category: 'TRAINING' as const, effect: { type: 'ATTRIBUTE_BOOST' as const, value: 1, attribute: 'speed' as const }, oneTime: true },
+  { id: 'stamina_course', name: 'Stamina Course', description: '+1 permanent stamina', price: 1000, icon: '💪', category: 'TRAINING' as const, effect: { type: 'ATTRIBUTE_BOOST' as const, value: 1, attribute: 'stamina' as const }, oneTime: true },
+  { id: 'goal_sense_training', name: 'Goal Sense Training', description: '+1 permanent goal sense', price: 1000, icon: '🎯', category: 'TRAINING' as const, effect: { type: 'ATTRIBUTE_BOOST' as const, value: 1, attribute: 'goalSense' as const }, oneTime: true },
+
+  // CAREER ITEMS (One-time purchases with special effects)
+  { id: 'agent', name: 'Hire Agent', description: 'Better transfer offers', price: 5000, icon: '💼', category: 'CAREER' as const, effect: { type: 'COSMETIC' as const, value: 0 }, oneTime: true },
+  { id: 'pr_manager', name: 'PR Manager', description: 'Boost fan popularity', price: 3000, icon: '📱', category: 'CAREER' as const, effect: { type: 'COSMETIC' as const, value: 0 }, oneTime: true },
+  { id: 'lucky_charm', name: 'Lucky Charm', description: 'Better match performance', price: 2500, icon: '🍀', category: 'CAREER' as const, effect: { type: 'COSMETIC' as const, value: 0 }, oneTime: true },
+];
+
 // --- NAME GENERATION DATA ---
 export const FIRST_NAMES = [
   "Aaron", "Adam", "Adrian", "Aidan", "Alex", "Alexander", "Ali", "Angus", "Anthony", "Archie",
@@ -218,3 +253,653 @@ export const LAST_NAMES = [
   "Wells", "West", "Wheeler", "White", "Whitehead", "Wilkins", "Wilkinson", "Williams", "Williamson", "Willis",
   "Wills", "Wilson", "Winter", "Wise", "Wood", "Woods", "Wright", "Yates", "Young"
 ];
+
+// ===== AWARDS & HONORS =====
+export enum AwardType {
+  BROWNLOW_MEDAL = 'Brownlow Medal',
+  COLEMAN_MEDAL = 'Coleman Medal',
+  ALL_AUSTRALIAN = 'All-Australian Team',
+  CLUB_BEST_AND_FAIREST = 'Club Best & Fairest',
+  RISING_STAR = 'Rising Star',
+  LEADING_DISPOSAL_WINNER = 'Leading Disposal Winner',
+  LEADING_TACKLER = 'Leading Tackler',
+  MARK_OF_THE_YEAR = 'Mark of the Year',
+  GOAL_OF_THE_YEAR = 'Goal of the Year'
+}
+
+export const AWARD_DESCRIPTIONS = {
+  [AwardType.BROWNLOW_MEDAL]: 'Most votes for best & fairest player across the season',
+  [AwardType.COLEMAN_MEDAL]: 'Leading goal scorer of the season',
+  [AwardType.ALL_AUSTRALIAN]: 'Selected in the best 22 players of the season',
+  [AwardType.CLUB_BEST_AND_FAIREST]: 'Voted best player at your club',
+  [AwardType.RISING_STAR]: 'Outstanding young player (under 21)',
+  [AwardType.LEADING_DISPOSAL_WINNER]: 'Most disposals in the season',
+  [AwardType.LEADING_TACKLER]: 'Most tackles in the season',
+  [AwardType.MARK_OF_THE_YEAR]: 'Most spectacular mark of the season',
+  [AwardType.GOAL_OF_THE_YEAR]: 'Most spectacular goal of the season'
+};
+
+export const AWARD_ICONS = {
+  [AwardType.BROWNLOW_MEDAL]: '🏅',
+  [AwardType.COLEMAN_MEDAL]: '⚽',
+  [AwardType.ALL_AUSTRALIAN]: '⭐',
+  [AwardType.CLUB_BEST_AND_FAIREST]: '🏆',
+  [AwardType.RISING_STAR]: '🌟',
+  [AwardType.LEADING_DISPOSAL_WINNER]: '🎯',
+  [AwardType.LEADING_TACKLER]: '💪',
+  [AwardType.MARK_OF_THE_YEAR]: '🙌',
+  [AwardType.GOAL_OF_THE_YEAR]: '🔥'
+};
+
+// ===== CAREER EVENTS & RANDOM ENCOUNTERS =====
+
+export interface CareerEventTemplate {
+  type: 'PERSONAL' | 'PROFESSIONAL' | 'RIVALRY' | 'TEAMMATE' | 'INJURY' | 'FINANCIAL' | 'OPPORTUNITY' | 'CRISIS';
+  category: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' | 'CHOICE';
+  title: string;
+  description: string;
+  icon: string;
+  rarity: 'COMMON' | 'UNCOMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
+  triggerCondition?: string;
+  immediateEffects?: any;
+  choices?: any[];
+}
+
+export const CAREER_EVENT_TEMPLATES: CareerEventTemplate[] = [
+  // ===== POSITIVE EVENTS =====
+  {
+    type: 'PROFESSIONAL',
+    category: 'POSITIVE',
+    title: 'Media Coaching Session',
+    description: 'Your club has arranged professional media training to help you handle interviews better.',
+    icon: '🎤',
+    rarity: 'COMMON',
+    immediateEffects: {
+      mediaReputation: 5,
+      skillPoints: 1,
+      resultText: 'You feel more confident speaking to the media!'
+    }
+  },
+  {
+    type: 'PERSONAL',
+    category: 'POSITIVE',
+    title: 'Perfect Night Sleep',
+    description: 'You had the best sleep of your life. You wake up feeling completely refreshed and ready to dominate!',
+    icon: '😴',
+    rarity: 'COMMON',
+    immediateEffects: {
+      energy: 30,
+      morale: 10,
+      resultText: 'You feel incredible and ready to take on the world!'
+    }
+  },
+  {
+    type: 'PROFESSIONAL',
+    category: 'POSITIVE',
+    title: 'Performance Bonus',
+    description: 'Your recent form has earned you a performance bonus from the club!',
+    icon: '💰',
+    rarity: 'UNCOMMON',
+    triggerCondition: 'WIN_STREAK_3',
+    immediateEffects: {
+      wallet: 5000,
+      morale: 15,
+      resultText: 'The club rewards your excellent performances with extra cash!'
+    }
+  },
+  {
+    type: 'TEAMMATE',
+    category: 'POSITIVE',
+    title: 'Mentorship Opportunity',
+    description: 'A club legend has offered to personally train with you this week.',
+    icon: '🤝',
+    rarity: 'RARE',
+    immediateEffects: {
+      attributeChanges: { kicking: 2, marking: 2 },
+      xp: 500,
+      morale: 20,
+      resultText: 'Training with a legend has improved your skills significantly!'
+    }
+  },
+  {
+    type: 'PERSONAL',
+    category: 'POSITIVE',
+    title: 'Charity Event Success',
+    description: 'Your charity work in the community has gone viral on social media!',
+    icon: '❤️',
+    rarity: 'UNCOMMON',
+    immediateEffects: {
+      mediaReputation: 15,
+      fanFollowers: 5000,
+      morale: 10,
+      resultText: 'Fans love seeing you give back to the community!'
+    }
+  },
+
+  // ===== NEGATIVE EVENTS =====
+  {
+    type: 'PERSONAL',
+    category: 'NEGATIVE',
+    title: 'Food Poisoning',
+    description: 'That dodgy kebab from last night is coming back to haunt you...',
+    icon: '🤢',
+    rarity: 'COMMON',
+    immediateEffects: {
+      energy: -20,
+      morale: -5,
+      resultText: 'You spend the day feeling awful. Note to self: avoid that food truck.'
+    }
+  },
+  {
+    type: 'PROFESSIONAL',
+    category: 'NEGATIVE',
+    title: 'Social Media Backlash',
+    description: 'An old social media post has resurfaced and fans aren\'t happy.',
+    icon: '📱',
+    rarity: 'UNCOMMON',
+    immediateEffects: {
+      mediaReputation: -10,
+      fanFollowers: -2000,
+      morale: -15,
+      resultText: 'The online criticism hurts, but you\'ll learn from this.'
+    }
+  },
+  {
+    type: 'INJURY',
+    category: 'NEGATIVE',
+    title: 'Minor Training Injury',
+    description: 'You tweaked something at training. It\'s not serious, but you\'ll need to rest.',
+    icon: '🩹',
+    rarity: 'COMMON',
+    triggerCondition: 'LOW_ENERGY',
+    immediateEffects: {
+      injuryWeeks: 1,
+      morale: -10,
+      resultText: 'A week on the sidelines to recover. Time to rest up.'
+    }
+  },
+  {
+    type: 'RIVALRY',
+    category: 'NEGATIVE',
+    title: 'Heated Exchange',
+    description: 'You and an opponent had a heated exchange after the match. The media is all over it.',
+    icon: '😤',
+    rarity: 'UNCOMMON',
+    triggerCondition: 'AFTER_LOSS',
+    immediateEffects: {
+      mediaReputation: -5,
+      morale: -5,
+      resultText: 'The incident is all over the news. You\'ll need to keep your cool next time.'
+    }
+  },
+  {
+    type: 'FINANCIAL',
+    category: 'NEGATIVE',
+    title: 'Unexpected Expense',
+    description: 'Your car broke down and repairs are expensive.',
+    icon: '🚗',
+    rarity: 'COMMON',
+    immediateEffects: {
+      wallet: -3000,
+      morale: -5,
+      resultText: 'Ouch. That hurt the bank account.'
+    }
+  },
+
+  // ===== CHOICE-BASED EVENTS =====
+  {
+    type: 'OPPORTUNITY',
+    category: 'CHOICE',
+    title: 'Sponsorship Deal Offer',
+    description: 'A sports brand wants you to become their ambassador. Accept the deal or focus on football?',
+    icon: '🏷️',
+    rarity: 'RARE',
+    triggerCondition: 'HIGH_MEDIA_REP',
+    choices: [
+      {
+        id: 'accept_deal',
+        label: 'Accept the Deal',
+        description: 'Take the money and build your brand',
+        icon: '💼',
+        effects: {
+          wallet: 10000,
+          mediaReputation: 10,
+          fanFollowers: 3000,
+          energy: -10,
+          resultText: 'The sponsorship deal is lucrative, but takes time away from training.'
+        },
+        risk: 'LOW'
+      },
+      {
+        id: 'decline_deal',
+        label: 'Decline Politely',
+        description: 'Stay focused on your football career',
+        icon: '🏉',
+        effects: {
+          morale: 5,
+          skillPoints: 2,
+          resultText: 'You stay focused on football. Your dedication impresses the coaches.'
+        },
+        risk: 'LOW'
+      }
+    ]
+  },
+  {
+    type: 'CRISIS',
+    category: 'CHOICE',
+    title: 'Teammate Conflict',
+    description: 'You\'ve had a falling out with a senior teammate. How do you handle it?',
+    icon: '⚠️',
+    rarity: 'UNCOMMON',
+    choices: [
+      {
+        id: 'apologize',
+        label: 'Apologize',
+        description: 'Take the high road and make peace',
+        icon: '🤝',
+        effects: {
+          morale: 10,
+          mediaReputation: 5,
+          resultText: 'You squash the beef and the team is stronger for it.'
+        },
+        risk: 'LOW'
+      },
+      {
+        id: 'stand_ground',
+        label: 'Stand Your Ground',
+        description: 'Don\'t back down from your position',
+        icon: '💪',
+        effects: {
+          morale: -10,
+          mediaReputation: -10,
+          attributeChanges: { tackling: 1 },
+          resultText: 'You maintain your integrity, but team chemistry suffers.'
+        },
+        risk: 'HIGH'
+      },
+      {
+        id: 'avoid',
+        label: 'Avoid the Issue',
+        description: 'Just focus on football and ignore it',
+        icon: '🙈',
+        effects: {
+          morale: -5,
+          energy: -5,
+          resultText: 'The tension lingers, but at least there\'s no drama.'
+        },
+        risk: 'MEDIUM'
+      }
+    ]
+  },
+  {
+    type: 'PROFESSIONAL',
+    category: 'CHOICE',
+    title: 'Intense Training Camp Invitation',
+    description: 'An elite training camp during the off-season could improve your skills, but it\'s exhausting.',
+    icon: '🏋️',
+    rarity: 'UNCOMMON',
+    choices: [
+      {
+        id: 'attend_full',
+        label: 'Full Commitment',
+        description: 'Give it everything you\'ve got',
+        icon: '💯',
+        effects: {
+          attributeChanges: { stamina: 3, speed: 2 },
+          energy: -30,
+          wallet: -2000,
+          xp: 1000,
+          resultText: 'Brutal but worth it. You\'ve never been fitter!'
+        },
+        risk: 'HIGH'
+      },
+      {
+        id: 'attend_partial',
+        label: 'Partial Participation',
+        description: 'Attend but take it easy',
+        icon: '⚖️',
+        effects: {
+          attributeChanges: { stamina: 1 },
+          energy: -10,
+          wallet: -1000,
+          xp: 300,
+          resultText: 'A balanced approach yields modest improvements.'
+        },
+        risk: 'LOW'
+      },
+      {
+        id: 'skip',
+        label: 'Skip It',
+        description: 'Rest and recover instead',
+        icon: '🏖️',
+        effects: {
+          energy: 20,
+          morale: -5,
+          resultText: 'You feel refreshed, but wonder if you missed an opportunity.'
+        },
+        risk: 'LOW'
+      }
+    ]
+  },
+  {
+    type: 'OPPORTUNITY',
+    category: 'CHOICE',
+    title: 'Position Change Request',
+    description: 'The coach wants to try you in a different position. It could expand your game or throw you off.',
+    icon: '🔄',
+    rarity: 'RARE',
+    choices: [
+      {
+        id: 'embrace_change',
+        label: 'Embrace the Challenge',
+        description: 'Learn a new position and become more versatile',
+        icon: '🌟',
+        effects: {
+          xp: 800,
+          morale: 5,
+          skillPoints: 3,
+          resultText: 'Versatility is valuable. You\'re now a multi-position threat!'
+        },
+        risk: 'MEDIUM'
+      },
+      {
+        id: 'resist_change',
+        label: 'Stick to Your Strengths',
+        description: 'Politely decline and stay in your preferred position',
+        icon: '🛡️',
+        effects: {
+          morale: -10,
+          mediaReputation: -5,
+          resultText: 'The coach respects your decision but isn\'t thrilled.'
+        },
+        risk: 'MEDIUM'
+      }
+    ]
+  },
+
+  // ===== LEGENDARY/EPIC EVENTS =====
+  {
+    type: 'OPPORTUNITY',
+    category: 'POSITIVE',
+    title: 'State Team Selection',
+    description: 'You\'ve been selected to represent your state in an exhibition match!',
+    icon: '🏆',
+    rarity: 'EPIC',
+    triggerCondition: 'HIGH_STATS',
+    immediateEffects: {
+      mediaReputation: 20,
+      fanFollowers: 10000,
+      morale: 25,
+      xp: 1500,
+      wallet: 5000,
+      resultText: 'An incredible honor! Your profile just skyrocketed!'
+    }
+  },
+  {
+    type: 'PERSONAL',
+    category: 'POSITIVE',
+    title: 'Wedding Day',
+    description: 'You\'ve tied the knot! Life off the field is looking bright.',
+    icon: '💍',
+    rarity: 'LEGENDARY',
+    immediateEffects: {
+      morale: 40,
+      energy: 20,
+      mediaReputation: 10,
+      fanFollowers: 5000,
+      wallet: -15000,
+      resultText: 'The happiest day of your life! Though expensive, worth every cent.'
+    }
+  },
+  {
+    type: 'CRISIS',
+    category: 'CHOICE',
+    title: 'Serious Injury Setback',
+    description: 'A significant injury threatens your season. Surgery and recovery, or risk playing through it?',
+    icon: '🏥',
+    rarity: 'EPIC',
+    triggerCondition: 'INJURY_PRONE',
+    choices: [
+      {
+        id: 'surgery',
+        label: 'Get Surgery',
+        description: 'Miss 4+ weeks but fully recover',
+        icon: '⚕️',
+        effects: {
+          injuryWeeks: 4,
+          morale: -15,
+          energy: -40,
+          resultText: 'A tough recovery ahead, but you\'ll come back stronger.'
+        },
+        risk: 'MEDIUM'
+      },
+      {
+        id: 'play_through',
+        label: 'Play Through Pain',
+        description: 'Take painkillers and push through',
+        icon: '💊',
+        effects: {
+          attributeChanges: { speed: -3, stamina: -2 },
+          morale: 10,
+          energy: -20,
+          resultText: 'You gut it out, but your body pays the price long-term.'
+        },
+        risk: 'HIGH'
+      }
+    ]
+  },
+  {
+    type: 'OPPORTUNITY',
+    category: 'CHOICE',
+    title: 'Reality TV Show Offer',
+    description: 'You\'ve been offered a spot on a reality TV show. Big money, but it could impact your reputation.',
+    icon: '📺',
+    rarity: 'RARE',
+    triggerCondition: 'HIGH_MEDIA_REP',
+    choices: [
+      {
+        id: 'accept_tv',
+        label: 'Accept the Offer',
+        description: 'Cash in on your fame',
+        icon: '💵',
+        effects: {
+          wallet: 25000,
+          fanFollowers: 15000,
+          mediaReputation: -15,
+          morale: 10,
+          energy: -20,
+          resultText: 'You make bank, but some footy purists aren\'t happy.'
+        },
+        risk: 'HIGH'
+      },
+      {
+        id: 'decline_tv',
+        label: 'Decline the Offer',
+        description: 'Stay focused on football',
+        icon: '🏉',
+        effects: {
+          mediaReputation: 10,
+          morale: 5,
+          resultText: 'You maintain your football-first reputation. Respect.'
+        },
+        risk: 'LOW'
+      }
+    ]
+  },
+
+  // ===== MORE COMMON EVENTS =====
+  {
+    type: 'PERSONAL',
+    category: 'NEUTRAL',
+    title: 'Old Friend Visits',
+    description: 'A childhood friend is in town and wants to catch up over coffee.',
+    icon: '☕',
+    rarity: 'COMMON',
+    immediateEffects: {
+      morale: 10,
+      energy: -5,
+      resultText: 'A nice reminder of where you came from. Keeps you grounded.'
+    }
+  },
+  {
+    type: 'PROFESSIONAL',
+    category: 'POSITIVE',
+    title: 'Coach\'s Praise',
+    description: 'The coach singled you out at the team meeting for your recent efforts.',
+    icon: '👏',
+    rarity: 'COMMON',
+    triggerCondition: 'GOOD_FORM',
+    immediateEffects: {
+      morale: 15,
+      xp: 200,
+      resultText: 'Public recognition from the coach boosts your confidence!'
+    }
+  },
+  {
+    type: 'TEAMMATE',
+    category: 'POSITIVE',
+    title: 'Team Bonding Activity',
+    description: 'The boys organized a team dinner. Great for morale!',
+    icon: '🍻',
+    rarity: 'COMMON',
+    immediateEffects: {
+      morale: 12,
+      energy: -5,
+      resultText: 'Team chemistry is important. You bond with your teammates.'
+    }
+  },
+  {
+    type: 'PROFESSIONAL',
+    category: 'NEGATIVE',
+    title: 'Coach\'s Criticism',
+    description: 'The coach wasn\'t impressed with your recent training efforts.',
+    icon: '😠',
+    rarity: 'COMMON',
+    triggerCondition: 'LOW_ENERGY',
+    immediateEffects: {
+      morale: -10,
+      resultText: 'Ouch. Time to lift your intensity at training.'
+    }
+  },
+  {
+    type: 'PERSONAL',
+    category: 'POSITIVE',
+    title: 'Fan Encounter',
+    description: 'A young fan asked for your autograph. Made their day!',
+    icon: '✍️',
+    rarity: 'COMMON',
+    immediateEffects: {
+      morale: 8,
+      fanFollowers: 500,
+      resultText: 'Small moments like this remind you why you play.'
+    }
+  }
+];
+
+// ===== TEAM CHEMISTRY & RELATIONSHIPS =====
+
+export const PERSONALITY_TYPES = [
+  'LEADER',
+  'JOKER',
+  'QUIET',
+  'INTENSE',
+  'SUPPORTIVE',
+  'COMPETITIVE'
+] as const;
+
+export const RELATIONSHIP_STATUS_THRESHOLDS = {
+  ENEMY: 0,
+  RIVAL: 20,
+  STRANGER: 40,
+  ACQUAINTANCE: 55,
+  FRIEND: 70,
+  CLOSE_FRIEND: 85,
+  BEST_MATE: 95
+};
+
+export const CHEMISTRY_FORM_THRESHOLDS = {
+  FREEZING: 0,
+  COLD: 30,
+  NEUTRAL: 50,
+  WARM: 70,
+  HOT: 85
+};
+
+// ===== COACHING & STAFF SYSTEM =====
+
+export const COACH_PERSONALITIES = [
+  'DISCIPLINARIAN',
+  'MENTOR',
+  'TACTICIAN',
+  'MOTIVATOR',
+  'INNOVATOR',
+  'VETERAN'
+] as const;
+
+export const COACH_SPECIALTIES = [
+  'TACTICS',
+  'LEADERSHIP',
+  'FITNESS',
+  'Forward',
+  'Midfielder',
+  'Defender',
+  'Ruck'
+] as const;
+
+export const STAFF_ROLES = {
+  FITNESS_TRAINER: { icon: '💪', effect: 'TRAINING' },
+  PHYSIO: { icon: '🏥', effect: 'RECOVERY' },
+  NUTRITIONIST: { icon: '🥗', effect: 'INJURY_PREVENTION' },
+  MENTAL_COACH: { icon: '🧠', effect: 'MORALE' },
+  SKILLS_COACH: { icon: '⚽', effect: 'ATTRIBUTES' }
+} as const;
+
+// Famous coach name templates (Australian football theme)
+export const COACH_FIRST_NAMES = [
+  'John', 'Michael', 'David', 'Chris', 'Mark', 'Paul', 'Peter', 'Tony',
+  'Kevin', 'Ross', 'Leigh', 'Mick', 'Alastair', 'Denis', 'Robert', 'Malcolm'
+];
+
+export const COACH_LAST_NAMES = [
+  'Thompson', 'Clarkson', 'Matthews', 'Sheedy', 'Jeans', 'Hafey', 'Malthouse',
+  'Worsfold', 'Roos', 'Longmire', 'Hardwick', 'Scott', 'Simpson', 'Beveridge'
+];
+
+export const COACH_PERSONALITY_EFFECTS = {
+  DISCIPLINARIAN: {
+    trainingBonus: 15,
+    moraleImpact: -5,
+    trustRequired: 70,
+    description: 'Demands excellence, tough but fair'
+  },
+  MENTOR: {
+    trainingBonus: 10,
+    moraleImpact: 10,
+    trustRequired: 50,
+    description: 'Supportive and developmental'
+  },
+  TACTICIAN: {
+    trainingBonus: 12,
+    moraleImpact: 0,
+    trustRequired: 60,
+    description: 'Strategic mastermind'
+  },
+  MOTIVATOR: {
+    trainingBonus: 8,
+    moraleImpact: 15,
+    trustRequired: 40,
+    description: 'Inspires peak performance'
+  },
+  INNOVATOR: {
+    trainingBonus: 13,
+    moraleImpact: 5,
+    trustRequired: 55,
+    description: 'Cutting-edge methods'
+  },
+  VETERAN: {
+    trainingBonus: 11,
+    moraleImpact: 8,
+    trustRequired: 45,
+    description: 'Wise and experienced'
+  }
+};

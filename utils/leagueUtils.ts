@@ -1,5 +1,49 @@
-import { Team, Fixture, LeagueTier, Position, MatchResult, Stadium } from '../types';
-import { TEAM_NAMES_LOCAL, FIRST_NAMES, LAST_NAMES, SEASON_LENGTH, STADIUM_TEMPLATES } from '../constants';
+import { Team, Fixture, LeagueTier, Position, MatchResult, Stadium, PlayerAttributes, AIPlayer } from '../types';
+import { TEAM_NAMES_LOCAL, TEAM_NAMES_STATE, TEAM_NAMES_AFL, FIRST_NAMES, LAST_NAMES, SEASON_LENGTH, STADIUM_TEMPLATES } from '../constants';
+
+// Generate attributes for AI player based on overall rating and position
+export const generateAIPlayerAttributes = (rating: number, position: Position): PlayerAttributes => {
+    // Base attributes around the target rating with variation
+    const baseValue = rating;
+    const variation = () => Math.floor((Math.random() - 0.5) * 20); // -10 to +10 variation
+
+    let attributes: PlayerAttributes = {
+        kicking: baseValue + variation(),
+        handball: baseValue + variation(),
+        tackling: baseValue + variation(),
+        marking: baseValue + variation(),
+        speed: baseValue + variation(),
+        stamina: baseValue + variation(),
+        goalSense: baseValue + variation()
+    };
+
+    // Position-specific strengths
+    if (position === Position.FORWARD) {
+        attributes.goalSense = Math.min(99, attributes.goalSense + 10);
+        attributes.kicking = Math.min(99, attributes.kicking + 5);
+        attributes.marking = Math.min(99, attributes.marking + 5);
+    } else if (position === Position.MIDFIELDER) {
+        attributes.stamina = Math.min(99, attributes.stamina + 10);
+        attributes.speed = Math.min(99, attributes.speed + 5);
+        attributes.handball = Math.min(99, attributes.handball + 5);
+    } else if (position === Position.DEFENDER) {
+        attributes.tackling = Math.min(99, attributes.tackling + 10);
+        attributes.marking = Math.min(99, attributes.marking + 5);
+        attributes.speed = Math.min(99, attributes.speed + 5);
+    } else if (position === Position.RUCK) {
+        attributes.marking = Math.min(99, attributes.marking + 10);
+        attributes.stamina = Math.min(99, attributes.stamina + 5);
+        attributes.tackling = Math.min(99, attributes.tackling + 5);
+    }
+
+    // Ensure all values are within bounds
+    Object.keys(attributes).forEach(key => {
+        const k = key as keyof PlayerAttributes;
+        attributes[k] = Math.max(20, Math.min(99, attributes[k]));
+    });
+
+    return attributes;
+};
 
 // Template for a balanced 22-man squad with specific positions
 export const ROSTER_TEMPLATE = [
@@ -55,15 +99,43 @@ const generateStadium = (teamName: string, tier: LeagueTier): Stadium => {
 
 // Helper to generate random teams with balanced rosters
 export const generateLeague = (tier: LeagueTier): Team[] => {
-  const names = TEAM_NAMES_LOCAL;
+  // Select team names based on tier
+  let names = TEAM_NAMES_LOCAL;
+  if (tier === LeagueTier.STATE) {
+    names = TEAM_NAMES_STATE;
+  } else if (tier === LeagueTier.NATIONAL) {
+    names = TEAM_NAMES_AFL;
+  }
   return names.map((name, i) => {
       // Generate players based on template
-      const players = ROSTER_TEMPLATE.map((slot, j) => ({
-          name: getRandomName(), // Uses real names now
-          position: slot.pos,
-          subPosition: slot.sub,
-          rating: 50 + Math.floor(Math.random() * 40)
-      }));
+      const players = ROSTER_TEMPLATE.map((slot, j) => {
+          // Random age between 18-35
+          const age = 18 + Math.floor(Math.random() * 18);
+
+          // Potential based on age (younger = higher potential)
+          let potential = 60 + Math.floor(Math.random() * 30); // 60-90
+          if (age <= 21) potential = Math.max(potential, 70); // Young players have higher floor
+          if (age >= 30) potential = Math.min(potential, 80); // Older players lower ceiling
+
+          // Current rating influenced by age (peak at 26-28)
+          let baseRating = 50 + Math.floor(Math.random() * 40);
+          if (age >= 26 && age <= 28) baseRating = Math.min(baseRating + 5, potential); // Peak years
+          if (age <= 20) baseRating = Math.max(40, Math.min(baseRating - 10, potential - 10)); // Young raw talent
+          if (age >= 32) baseRating = Math.max(40, baseRating - 5); // Declining veterans
+
+          const finalRating = Math.min(baseRating, potential);
+          const attributes = generateAIPlayerAttributes(finalRating, slot.pos);
+
+          return {
+              name: getRandomName(),
+              position: slot.pos,
+              subPosition: slot.sub,
+              rating: finalRating,
+              age,
+              potential,
+              attributes
+          };
+      });
 
       // Procedural Stadium
       const stadium = generateStadium(name, tier);
