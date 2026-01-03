@@ -21,6 +21,7 @@ import MediaHub from './components/MediaHub';
 import CareerEvents from './components/CareerEvents';
 import TeamChemistry from './components/TeamChemistry';
 import CoachingStaff from './components/CoachingStaff';
+import MasterSkillTree from './components/MasterSkillTree';
 
 const ScreenSelector: React.FC = () => {
   const { view, player, draftClass, draftProspect, simulateDraft, completeDraft } = useGame();
@@ -71,6 +72,8 @@ const ScreenSelector: React.FC = () => {
         return <TeamChemistry />;
     case 'COACHING_STAFF':
         return <CoachingStaff />;
+    case 'MASTER_SKILLS':
+        return <MasterSkillTree />;
     case 'SETTINGS':
         return <Settings />;
     case 'CAREER_SUMMARY':

@@ -28,19 +28,10 @@ export const initializeCoachingStaff = (tier: LeagueTier): CoachingStaff => {
     generateCoach('ASSISTANT', tierMultiplier)
   ];
 
-  const fitnessStaff = [
-    generateStaffMember('FITNESS_TRAINER', tierMultiplier),
-    generateStaffMember('NUTRITIONIST', tierMultiplier)
-  ];
-
-  const medicalStaff = [
-    generateStaffMember('PHYSIO', tierMultiplier),
-    generateStaffMember('PHYSIO', tierMultiplier)
-  ];
-
-  const mentalCoach = tier !== 'Local League'
-    ? generateStaffMember('MENTAL_COACH', tierMultiplier)
-    : undefined;
+  // NEW: Start with MINIMAL support staff - players must hire them!
+  const fitnessStaff: StaffMember[] = [];
+  const medicalStaff: StaffMember[] = [];
+  const mentalCoach: StaffMember | undefined = undefined;
 
   const staffRating = calculateStaffRating({
     headCoach,
@@ -428,4 +419,143 @@ export const getCoachRelationshipColor = (relationship: number): string => {
   if (relationship >= 40) return 'text-yellow-400';
   if (relationship >= 20) return 'text-orange-400';
   return 'text-red-400';
+};
+
+/**
+ * Generate available staff members for hire
+ */
+export const generateAvailableStaff = (tier: LeagueTier, count: number = 6): StaffMember[] => {
+  const tierMultiplier = tier === 'AFL' ? 1.0 : tier === 'State League' ? 0.75 : 0.5;
+  const roles: Array<'FITNESS_TRAINER' | 'PHYSIO' | 'NUTRITIONIST' | 'MENTAL_COACH'> = [
+    'FITNESS_TRAINER',
+    'PHYSIO',
+    'NUTRITIONIST',
+    'MENTAL_COACH'
+  ];
+
+  const availableStaff: StaffMember[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const role = roles[Math.floor(Math.random() * roles.length)];
+    const staff = generateStaffMember(role, tierMultiplier);
+
+    // Calculate costs based on expertise
+    const baseCost = tier === 'AFL' ? 1000 : tier === 'State League' ? 600 : 300;
+    const expertiseMultiplier = staff.expertise / 50; // 0.0 to 2.0
+
+    staff.weeklyCost = Math.floor(baseCost * expertiseMultiplier * 0.3); // Weekly is ~30% of base
+    staff.seasonCost = Math.floor(baseCost * expertiseMultiplier * 3); // Season is ~3x base
+
+    availableStaff.push(staff);
+  }
+
+  return availableStaff;
+};
+
+/**
+ * Hire a staff member
+ */
+export const hireStaff = (
+  coachingStaff: CoachingStaff,
+  staffMember: StaffMember,
+  contractType: 'PERMANENT' | 'TEMPORARY',
+  currentRound: number
+): { updatedStaff: CoachingStaff; cost: number } => {
+  const newStaff = { ...staffMember };
+  newStaff.contractType = contractType;
+
+  let cost = 0;
+
+  if (contractType === 'TEMPORARY') {
+    cost = newStaff.weeklyCost || 0;
+    newStaff.contractExpiry = currentRound + 1; // Expires next round
+  } else {
+    cost = newStaff.seasonCost || 0;
+    newStaff.contractExpiry = currentRound + 14; // Full season (14 rounds)
+  }
+
+  let updatedStaff = { ...coachingStaff };
+
+  // Add staff to appropriate array
+  switch (newStaff.role) {
+    case 'FITNESS_TRAINER':
+    case 'NUTRITIONIST':
+      updatedStaff.fitnessStaff = [...updatedStaff.fitnessStaff, newStaff];
+      break;
+    case 'PHYSIO':
+      updatedStaff.medicalStaff = [...updatedStaff.medicalStaff, newStaff];
+      break;
+    case 'MENTAL_COACH':
+      updatedStaff.mentalCoach = newStaff;
+      break;
+  }
+
+  // Recalculate bonuses
+  updatedStaff.staffRating = calculateStaffRating(updatedStaff);
+  updatedStaff.trainingBonus = calculateTrainingBonus(
+    updatedStaff.headCoach,
+    updatedStaff.assistantCoaches,
+    updatedStaff.fitnessStaff
+  );
+  updatedStaff.injuryPrevention = calculateInjuryPrevention(
+    updatedStaff.medicalStaff,
+    updatedStaff.fitnessStaff
+  );
+  updatedStaff.recoveryBonus = calculateRecoveryBonus(
+    updatedStaff.medicalStaff,
+    updatedStaff.fitnessStaff
+  );
+  updatedStaff.moraleBonus = calculateMoraleBonus(
+    updatedStaff.headCoach,
+    updatedStaff.mentalCoach
+  );
+
+  return { updatedStaff, cost };
+};
+
+/**
+ * Process staff contract expirations at round advance
+ */
+export const processStaffContracts = (
+  coachingStaff: CoachingStaff,
+  currentRound: number
+): CoachingStaff => {
+  let updatedStaff = { ...coachingStaff };
+
+  // Filter out expired staff
+  updatedStaff.fitnessStaff = updatedStaff.fitnessStaff.filter(
+    staff => !staff.contractExpiry || staff.contractExpiry > currentRound
+  );
+
+  updatedStaff.medicalStaff = updatedStaff.medicalStaff.filter(
+    staff => !staff.contractExpiry || staff.contractExpiry > currentRound
+  );
+
+  if (updatedStaff.mentalCoach && updatedStaff.mentalCoach.contractExpiry) {
+    if (updatedStaff.mentalCoach.contractExpiry <= currentRound) {
+      updatedStaff.mentalCoach = undefined;
+    }
+  }
+
+  // Recalculate bonuses
+  updatedStaff.staffRating = calculateStaffRating(updatedStaff);
+  updatedStaff.trainingBonus = calculateTrainingBonus(
+    updatedStaff.headCoach,
+    updatedStaff.assistantCoaches,
+    updatedStaff.fitnessStaff
+  );
+  updatedStaff.injuryPrevention = calculateInjuryPrevention(
+    updatedStaff.medicalStaff,
+    updatedStaff.fitnessStaff
+  );
+  updatedStaff.recoveryBonus = calculateRecoveryBonus(
+    updatedStaff.medicalStaff,
+    updatedStaff.fitnessStaff
+  );
+  updatedStaff.moraleBonus = calculateMoraleBonus(
+    updatedStaff.headCoach,
+    updatedStaff.mentalCoach
+  );
+
+  return updatedStaff;
 };

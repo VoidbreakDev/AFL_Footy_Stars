@@ -79,7 +79,7 @@ const PlayerStatsView: React.FC = () => {
             </div>
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="grid grid-cols-3 gap-3 mb-6">
                 <button
                     onClick={() => setView('ACHIEVEMENTS')}
                     className="py-3 bg-gradient-to-r from-yellow-600 to-orange-600 text-white font-black text-sm rounded-xl uppercase tracking-wide shadow-lg active:scale-95 transition-transform flex flex-col items-center justify-center gap-1"
@@ -100,6 +100,22 @@ const PlayerStatsView: React.FC = () => {
                         vs League
                     </span>
                 </button>
+                {player.mediaReputation && (
+                    <button
+                        onClick={() => setView('MEDIA_HUB')}
+                        className="py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white font-black text-sm rounded-xl uppercase tracking-wide shadow-lg active:scale-95 transition-transform flex flex-col items-center justify-center gap-1"
+                    >
+                        <span className="text-xl">📱</span>
+                        <span className="text-xs">Media</span>
+                        <span className="bg-white/20 px-2 py-0.5 rounded-full text-[10px]">
+                            {player.mediaReputation.fanFollowers >= 1000000
+                                ? `${(player.mediaReputation.fanFollowers / 1000000).toFixed(1)}M`
+                                : player.mediaReputation.fanFollowers >= 1000
+                                ? `${(player.mediaReputation.fanFollowers / 1000).toFixed(0)}K`
+                                : player.mediaReputation.fanFollowers}
+                        </span>
+                    </button>
+                )}
             </div>
 
             {/* BIO SECTION */}

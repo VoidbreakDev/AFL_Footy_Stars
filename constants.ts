@@ -15,6 +15,43 @@ export const TEAM_NAMES_AFL = [
   "Collingwood", "Carlton", "Essendon", "Richmond", "Hawthorn", "Geelong", "Sydney", "Brisbane"
 ];
 
+// Team Logo Mappings
+// For local images: place files in public/images/logos/[league]/[teamname].png
+// Files in public/ are served from root (e.g., /images/logos/local/mudcrabs.png)
+export const TEAM_LOGOS: { [key: string]: string } = {
+  // Local League - Using local image files
+  // Place your team logo images in: public/images/logos/local/
+  // Supported formats: .png, .jpg, .svg
+  "Mudcrabs": "/images/logos/local/mudcrabs.png",
+  "Bushrangers": "/images/logos/local/bushrangers.png",
+  "Magpies": "/images/logos/local/magpies.png",
+  "Tigers": "/images/logos/local/tigers.png",
+  "Blues": "/images/logos/local/blues.png",
+  "Demons": "/images/logos/local/demons.png",
+  "Lions": "/images/logos/local/lions.png",
+  "Hawks": "/images/logos/local/hawks.png",
+
+  // State League - Emoji fallbacks (replace with image paths when ready)
+  "Wildcats": "🐱",
+  "Scorpions": "🦂",
+  "Thunder": "⚡",
+  "Lightning": "🌩️",
+  "Flames": "🔥",
+  "Cyclones": "🌪️",
+  "Dragons": "🐉",
+  "Sharks": "🦈",
+
+  // AFL - Emoji fallbacks (replace with image paths when ready)
+  "Collingwood": "🐦‍⬛",
+  "Carlton": "💙",
+  "Essendon": "✈️",
+  "Richmond": "🐯",
+  "Hawthorn": "🦅",
+  "Geelong": "🐱",
+  "Sydney": "🦢",
+  "Brisbane": "🦁"
+};
+
 export const POSITIONS = [
   Position.FORWARD,
   Position.MIDFIELDER,
@@ -356,7 +393,7 @@ export const CAREER_EVENT_TEMPLATES: CareerEventTemplate[] = [
     rarity: 'RARE',
     immediateEffects: {
       attributeChanges: { kicking: 2, marking: 2 },
-      xp: 500,
+      skillPoints: 2,
       morale: 20,
       resultText: 'Training with a legend has improved your skills significantly!'
     }
@@ -548,7 +585,7 @@ export const CAREER_EVENT_TEMPLATES: CareerEventTemplate[] = [
           attributeChanges: { stamina: 3, speed: 2 },
           energy: -30,
           wallet: -2000,
-          xp: 1000,
+          skillPoints: 3,
           resultText: 'Brutal but worth it. You\'ve never been fitter!'
         },
         risk: 'HIGH'
@@ -562,7 +599,7 @@ export const CAREER_EVENT_TEMPLATES: CareerEventTemplate[] = [
           attributeChanges: { stamina: 1 },
           energy: -10,
           wallet: -1000,
-          xp: 300,
+          skillPoints: 1,
           resultText: 'A balanced approach yields modest improvements.'
         },
         risk: 'LOW'
@@ -595,9 +632,8 @@ export const CAREER_EVENT_TEMPLATES: CareerEventTemplate[] = [
         description: 'Learn a new position and become more versatile',
         icon: '🌟',
         effects: {
-          xp: 800,
           morale: 5,
-          skillPoints: 3,
+          skillPoints: 5,
           resultText: 'Versatility is valuable. You\'re now a multi-position threat!'
         },
         risk: 'MEDIUM'
@@ -630,7 +666,7 @@ export const CAREER_EVENT_TEMPLATES: CareerEventTemplate[] = [
       mediaReputation: 20,
       fanFollowers: 10000,
       morale: 25,
-      xp: 1500,
+      skillPoints: 5,
       wallet: 5000,
       resultText: 'An incredible honor! Your profile just skyrocketed!'
     }
@@ -751,7 +787,7 @@ export const CAREER_EVENT_TEMPLATES: CareerEventTemplate[] = [
     triggerCondition: 'GOOD_FORM',
     immediateEffects: {
       morale: 15,
-      xp: 200,
+      skillPoints: 1,
       resultText: 'Public recognition from the coach boosts your confidence!'
     }
   },
@@ -903,3 +939,338 @@ export const COACH_PERSONALITY_EFFECTS = {
     description: 'Wise and experienced'
   }
 };
+
+// ========================================
+// MASTER SKILL TREE
+// ========================================
+// Special abilities unlocked with high attribute levels + XP + SP
+
+import { MasterSkill } from './types';
+
+export const MASTER_SKILLS: MasterSkill[] = [
+  // ========== KICKING SKILLS ==========
+  {
+    id: 'long_bombing',
+    name: 'Long Bombing',
+    description: 'Unlock the ability to kick goals from outside 50 meters',
+    icon: '🚀',
+    category: 'kicking',
+    prerequisiteLevel: 25,
+    xpCost: 2500,
+    spCost: 10,
+    effectType: 'HIGHLIGHT_UNLOCK',
+    effectValue: 0.15, // 15% chance on long shots
+    rarity: 'RARE'
+  },
+  {
+    id: 'banana_kick',
+    name: 'Banana Kick Specialist',
+    description: 'Master the art of curving kicks around defenders',
+    icon: '🍌',
+    category: 'kicking',
+    prerequisiteLevel: 40,
+    xpCost: 5000,
+    spCost: 15,
+    effectType: 'HIGHLIGHT_UNLOCK',
+    effectValue: 0.2, // 20% chance for banana goals
+    rarity: 'EPIC'
+  },
+  {
+    id: 'clutch_kicker',
+    name: 'Clutch Kicker',
+    description: '+15% goal accuracy in close matches (within 12 points)',
+    icon: '🎯',
+    category: 'kicking',
+    prerequisiteLevel: 50,
+    xpCost: 7500,
+    spCost: 20,
+    effectType: 'MATCH_BONUS',
+    effectValue: 0.15,
+    rarity: 'EPIC'
+  },
+  {
+    id: 'torpedo_king',
+    name: 'Torpedo King',
+    description: 'Devastating long-range torpedoes that split the defense',
+    icon: '💥',
+    category: 'kicking',
+    prerequisiteLevel: 70,
+    xpCost: 12000,
+    spCost: 30,
+    effectType: 'HIGHLIGHT_UNLOCK',
+    effectValue: 0.25,
+    rarity: 'LEGENDARY'
+  },
+
+  // ========== MARKING SKILLS ==========
+  {
+    id: 'pack_crasher',
+    name: 'Pack Crasher',
+    description: 'Increased chance to take contested marks in heavy traffic',
+    icon: '🦘',
+    category: 'marking',
+    prerequisiteLevel: 30,
+    xpCost: 3000,
+    spCost: 12,
+    effectType: 'MATCH_BONUS',
+    effectValue: 0.2, // +20% contested mark chance
+    rarity: 'RARE'
+  },
+  {
+    id: 'specky_machine',
+    name: 'Specky Machine',
+    description: 'Master the spectacular mark - leap over opponents',
+    icon: '⭐',
+    category: 'marking',
+    prerequisiteLevel: 40,
+    xpCost: 5000,
+    spCost: 15,
+    effectType: 'HIGHLIGHT_UNLOCK',
+    effectValue: 0.18, // 18% chance for spectacular marks
+    rarity: 'EPIC'
+  },
+  {
+    id: 'intercept_master',
+    name: 'Intercept Master',
+    description: '+25% chance to intercept opposition kicks',
+    icon: '🛡️',
+    category: 'marking',
+    prerequisiteLevel: 55,
+    xpCost: 8000,
+    spCost: 22,
+    effectType: 'MATCH_BONUS',
+    effectValue: 0.25,
+    rarity: 'EPIC'
+  },
+  {
+    id: 'aerial_dominance',
+    name: 'Aerial Dominance',
+    description: 'Completely dominate aerial contests - near unstoppable',
+    icon: '👑',
+    category: 'marking',
+    prerequisiteLevel: 75,
+    xpCost: 15000,
+    spCost: 35,
+    effectType: 'ATTRIBUTE_MULTIPLIER',
+    effectValue: 1.3, // 30% marking effectiveness boost
+    rarity: 'LEGENDARY'
+  },
+
+  // ========== HANDBALL SKILLS ==========
+  {
+    id: 'bullet_handball',
+    name: 'Bullet Handball',
+    description: 'Lightning-fast handballs that cut through traffic',
+    icon: '⚡',
+    category: 'handball',
+    prerequisiteLevel: 30,
+    xpCost: 3000,
+    spCost: 12,
+    effectType: 'MATCH_BONUS',
+    effectValue: 0.15, // +15% handball effectiveness
+    rarity: 'RARE'
+  },
+  {
+    id: 'handball_receive',
+    name: 'Handball Receive Specialist',
+    description: 'Expert at receiving and delivering in tight spaces',
+    icon: '🤝',
+    category: 'handball',
+    prerequisiteLevel: 45,
+    xpCost: 6000,
+    spCost: 18,
+    effectType: 'MATCH_BONUS',
+    effectValue: 0.2, // +5 disposals per game average
+    rarity: 'EPIC'
+  },
+  {
+    id: 'dont_argue',
+    name: 'Don\'t Argue',
+    description: 'Powerful fend-off technique to create space',
+    icon: '💪',
+    category: 'handball',
+    prerequisiteLevel: 60,
+    xpCost: 9000,
+    spCost: 25,
+    effectType: 'HIGHLIGHT_UNLOCK',
+    effectValue: 0.15,
+    rarity: 'EPIC'
+  },
+
+  // ========== TACKLING SKILLS ==========
+  {
+    id: 'shutdown_defender',
+    name: 'Shutdown Defender',
+    description: 'Lock down your opponent - they can\'t shake you',
+    icon: '🔒',
+    category: 'tackling',
+    prerequisiteLevel: 35,
+    xpCost: 4000,
+    spCost: 14,
+    effectType: 'MATCH_BONUS',
+    effectValue: 0.25, // +25% tackle effectiveness
+    rarity: 'RARE'
+  },
+  {
+    id: 'gang_tackle',
+    name: 'Gang Tackle Coordinator',
+    description: 'Organize multi-player tackles for turnovers',
+    icon: '👥',
+    category: 'tackling',
+    prerequisiteLevel: 50,
+    xpCost: 7000,
+    spCost: 20,
+    effectType: 'MATCH_BONUS',
+    effectValue: 0.2, // +20% turnover chance
+    rarity: 'EPIC'
+  },
+  {
+    id: 'bump_master',
+    name: 'Bump Master',
+    description: 'Devastating hip-and-shoulder that rocks opponents',
+    icon: '💢',
+    category: 'tackling',
+    prerequisiteLevel: 65,
+    xpCost: 10000,
+    spCost: 28,
+    effectType: 'HIGHLIGHT_UNLOCK',
+    effectValue: 0.2,
+    rarity: 'LEGENDARY'
+  },
+
+  // ========== SPEED SKILLS ==========
+  {
+    id: 'burst_speed',
+    name: 'Burst Speed',
+    description: 'Explosive acceleration to break away from opponents',
+    icon: '💨',
+    category: 'speed',
+    prerequisiteLevel: 35,
+    xpCost: 4000,
+    spCost: 14,
+    effectType: 'MATCH_BONUS',
+    effectValue: 0.2, // +20% breakaway chance
+    rarity: 'RARE'
+  },
+  {
+    id: 'coast_to_coast',
+    name: 'Coast to Coast',
+    description: 'Run the length of the field for spectacular goals',
+    icon: '🏃',
+    category: 'speed',
+    prerequisiteLevel: 55,
+    xpCost: 8000,
+    spCost: 22,
+    effectType: 'HIGHLIGHT_UNLOCK',
+    effectValue: 0.12, // 12% chance for coast-to-coast goals
+    rarity: 'EPIC'
+  },
+  {
+    id: 'untouchable',
+    name: 'Untouchable',
+    description: 'Peak speed - opponents can\'t lay a finger on you',
+    icon: '👻',
+    category: 'speed',
+    prerequisiteLevel: 80,
+    xpCost: 18000,
+    spCost: 40,
+    effectType: 'ATTRIBUTE_MULTIPLIER',
+    effectValue: 1.4, // 40% speed effectiveness boost
+    rarity: 'LEGENDARY'
+  },
+
+  // ========== STAMINA SKILLS ==========
+  {
+    id: 'fourth_quarter_beast',
+    name: 'Fourth Quarter Beast',
+    description: '+30% performance in the final quarter when tired',
+    icon: '🔥',
+    category: 'stamina',
+    prerequisiteLevel: 40,
+    xpCost: 5000,
+    spCost: 16,
+    effectType: 'MATCH_BONUS',
+    effectValue: 0.3,
+    rarity: 'EPIC'
+  },
+  {
+    id: 'workhorse',
+    name: 'Workhorse',
+    description: 'Never tire - maintain peak performance all game',
+    icon: '🐎',
+    category: 'stamina',
+    prerequisiteLevel: 60,
+    xpCost: 9000,
+    spCost: 25,
+    effectType: 'MATCH_BONUS',
+    effectValue: 0.25, // +25% overall stamina
+    rarity: 'EPIC'
+  },
+  {
+    id: 'iron_man',
+    name: 'Iron Man',
+    description: 'Legendary endurance - play every second without fatigue',
+    icon: '🦾',
+    category: 'stamina',
+    prerequisiteLevel: 85,
+    xpCost: 20000,
+    spCost: 45,
+    effectType: 'ATTRIBUTE_MULTIPLIER',
+    effectValue: 1.5, // 50% stamina boost
+    rarity: 'LEGENDARY'
+  },
+
+  // ========== GOAL SENSE SKILLS ==========
+  {
+    id: 'goal_sneak',
+    name: 'Goal Sneak',
+    description: 'Find space in the forward 50 - always dangerous',
+    icon: '🎪',
+    category: 'goalSense',
+    prerequisiteLevel: 30,
+    xpCost: 3000,
+    spCost: 12,
+    effectType: 'MATCH_BONUS',
+    effectValue: 0.2, // +20% goal scoring chance
+    rarity: 'RARE'
+  },
+  {
+    id: 'crumb_master',
+    name: 'Crumb Master',
+    description: 'Elite at gathering ground balls in the goal square',
+    icon: '🍞',
+    category: 'goalSense',
+    prerequisiteLevel: 45,
+    xpCost: 6000,
+    spCost: 18,
+    effectType: 'MATCH_BONUS',
+    effectValue: 0.25, // +25% crumbing ability
+    rarity: 'EPIC'
+  },
+  {
+    id: 'goal_sense_master',
+    name: 'Goal Sense Master',
+    description: 'Uncanny ability to find goals from anywhere',
+    icon: '🧭',
+    category: 'goalSense',
+    prerequisiteLevel: 70,
+    xpCost: 12000,
+    spCost: 30,
+    effectType: 'ATTRIBUTE_MULTIPLIER',
+    effectValue: 1.35, // 35% goal sense boost
+    rarity: 'LEGENDARY'
+  },
+  {
+    id: 'Coleman_medal_threat',
+    name: 'Coleman Medal Threat',
+    description: 'Elite goal-kicking prowess - bag 5+ goals regularly',
+    icon: '🏅',
+    category: 'goalSense',
+    prerequisiteLevel: 90,
+    xpCost: 25000,
+    spCost: 50,
+    effectType: 'ATTRIBUTE_MULTIPLIER',
+    effectValue: 1.6, // 60% goal sense boost
+    rarity: 'LEGENDARY'
+  }
+];

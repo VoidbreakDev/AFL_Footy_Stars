@@ -14,6 +14,8 @@ import { createDraftClass, shouldHoldDraft, simulateDraftPick, isPlayerDraftElig
 import { processLeagueRosterTurnover } from '../utils/rosterUtils';
 import { initializeMediaReputation, generateMediaEvent, updateMediaReputation, respondToMediaEvent, createSocialMediaPost, calculatePassiveFanGrowth } from '../utils/mediaUtils';
 import { generateCareerEvent, canGenerateNewEvent, resolveCareerEvent, resolveCareerEventChoice } from '../utils/careerEventUtils';
+import { initializeTeamChemistry, calculateOverallChemistry, updateTeamChemistryAfterMatch, generateTeammateInteraction, updateTeammateRelationship, incrementMatchesTogether, calculateChemistryBonus } from '../utils/chemistryUtils';
+import { initializeCoachingStaff, generateCoachInteraction, updateCoachRelationship, hireStaff, processStaffContracts } from '../utils/coachingUtils';
 
 interface GameContextType {
   player: PlayerProfile | null;
@@ -27,7 +29,7 @@ interface GameContextType {
   trainAttribute: (attr: keyof PlayerProfile['attributes']) => void;
   advanceRound: () => void;
   simulateRound: () => void; // New function for injured players to skip match
-  view: 'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' | 'MILESTONES' | 'PLAYER_COMPARISON' | 'TRANSFER_MARKET' | 'SHOP' | 'SETTINGS' | 'CAREER_SUMMARY' | 'DRAFT' | 'MEDIA_HUB' | 'CAREER_EVENTS' | 'TEAM_CHEMISTRY' | 'COACHING_STAFF';
+  view: 'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' | 'MILESTONES' | 'PLAYER_COMPARISON' | 'TRANSFER_MARKET' | 'SHOP' | 'SETTINGS' | 'CAREER_SUMMARY' | 'DRAFT' | 'MEDIA_HUB' | 'CAREER_EVENTS' | 'TEAM_CHEMISTRY' | 'COACHING_STAFF' | 'MASTER_SKILLS';
   setView: React.Dispatch<React.SetStateAction<any>>;
   lastMatchResult: MatchResult | null;
   saveGame: () => void;
@@ -51,7 +53,14 @@ interface GameContextType {
   respondToMedia?: (eventId: string, responseType: 'HUMBLE' | 'CONFIDENT' | 'IGNORE') => void;
   createSocialPost?: (content: string) => void;
   resolveEvent: (eventId: string) => void;
-  resolveEventChoice: (eventId: string, choiceId: string) => void;
+  resolveEventChoice: (eventId: string) => void;
+  hireCoachingStaff?: (staffMember: any, contractType: 'PERMANENT' | 'TEMPORARY') => void;
+  showFinalsIntro: boolean;
+  dismissFinalsIntro: () => void;
+  showSemiFinalsResults: boolean;
+  dismissSemiFinalsResults: () => void;
+  showGrandFinalResult: boolean;
+  dismissGrandFinalResult: () => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -61,12 +70,17 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [league, setLeague] = useState<Team[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [currentRound, setCurrentRound] = useState(1);
-  const [view, setView] = useState<'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' | 'MILESTONES' | 'PLAYER_COMPARISON' | 'TRANSFER_MARKET' | 'SHOP' | 'SETTINGS' | 'CAREER_SUMMARY' | 'DRAFT' | 'MEDIA_HUB' | 'CAREER_EVENTS' | 'TEAM_CHEMISTRY' | 'COACHING_STAFF'>('ONBOARDING');
+  const [view, setView] = useState<'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' | 'MILESTONES' | 'PLAYER_COMPARISON' | 'TRANSFER_MARKET' | 'SHOP' | 'SETTINGS' | 'CAREER_SUMMARY' | 'DRAFT' | 'MEDIA_HUB' | 'CAREER_EVENTS' | 'TEAM_CHEMISTRY' | 'COACHING_STAFF' | 'MASTER_SKILLS'>('ONBOARDING');
   const [lastMatchResult, setLastMatchResult] = useState<MatchResult | null>(null);
   const [showSeasonRecap, setShowSeasonRecap] = useState(false);
   const [seasonAwards, setSeasonAwards] = useState<Award[]>([]);
   const [draftClass, setDraftClass] = useState<DraftClass | null>(null);
   const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
+
+  // Finals progression screens
+  const [showFinalsIntro, setShowFinalsIntro] = useState(false);
+  const [showSemiFinalsResults, setShowSemiFinalsResults] = useState(false);
+  const [showGrandFinalResult, setShowGrandFinalResult] = useState(false);
 
   // Helper function to inject player into team roster
   const injectPlayerIntoTeam = (league: Team[], player: PlayerProfile, teamName: string): Team[] => {
@@ -110,6 +124,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (profile.position === Position.DEFENDER) defaultSub = 'HBF';
     if (profile.position === Position.RUCK) defaultSub = 'RUCK';
 
+    // Initialize team chemistry and coaching staff for the first team
+    const myTeam = newLeague[0];
+    const { teammates, teamChemistry } = initializeTeamChemistry(myTeam);
+    const coachingStaff = initializeCoachingStaff(LeagueTier.LOCAL);
+
     const updatedProfile = {
       ...profile,
       subPosition: defaultSub,
@@ -119,7 +138,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       currentYear: 1,
       seasonsPlayed: 0,
       careerHistory: [],
-      mediaReputation: initializeMediaReputation()
+      mediaReputation: initializeMediaReputation(),
+      teammates,
+      teamChemistry,
+      coachingStaff
     };
 
     updatedProfile.contract = {
@@ -132,7 +154,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 2. Inject User into Team Roster
     // Find the team in the league and swap the generic player in the user's slot with the user.
     const teamIndex = 0; // Default to first team
-    const myTeam = newLeague[teamIndex];
+    // (myTeam already declared above for chemistry initialization)
     
     // Calculate initial rating based on attributes
     const userRating = Math.floor(Object.values(updatedProfile.attributes).reduce((a,b) => a + b, 0) / 7);
@@ -177,6 +199,37 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (player.skillPoints > 0) {
         setPlayer(prev => {
             if(!prev) return null;
+
+            // Calculate training bonus from coaching staff
+            const coachingBonus = prev.coachingStaff?.trainingBonus || 0;
+
+            // Base attribute increase is 1
+            let attributeIncrease = 1;
+
+            // Apply coaching bonus (up to +25%)
+            // Chance to get additional +1 based on bonus percentage
+            if (coachingBonus > 0) {
+                const bonusChance = coachingBonus / 100; // Convert to 0.0-0.25 range
+                if (Math.random() < bonusChance) {
+                    attributeIncrease = 2; // Double improvement!
+                }
+            }
+
+            // Apply motivation boost if active
+            let additionalBonus = 0;
+            if (prev.motivationBoost && prev.motivationExpiry && currentRound < prev.motivationExpiry) {
+                // Motivation boost gives another chance for +1
+                const motivationChance = prev.motivationBoost / 100;
+                if (Math.random() < motivationChance) {
+                    additionalBonus = 1;
+                }
+            }
+
+            const newAttributeValue = Math.min(
+                prev.potential,
+                prev.attributes[attr] + attributeIncrease + additionalBonus
+            );
+
             return {
                 ...prev,
                 skillPoints: prev.skillPoints - 1,
@@ -184,7 +237,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 trainingSessions: (prev.trainingSessions || 0) + 1,
                 attributes: {
                     ...prev.attributes,
-                    [attr]: prev.attributes[attr] + 1
+                    [attr]: newAttributeValue
                 }
             }
         })
@@ -469,12 +522,108 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
           }
 
+          // --- TEAM CHEMISTRY & COACHING INTERACTIONS ---
+          let updatedTeammates = updatedPlayer.teammates || [];
+          let updatedTeamChemistry = updatedPlayer.teamChemistry;
+          let updatedCoachingStaff = updatedPlayer.coachingStaff;
+          let motivationBoost = updatedPlayer.motivationBoost || 0;
+          let motivationExpiry = updatedPlayer.motivationExpiry || 0;
+
+          // Calculate player match rating (0-10 scale)
+          const playerMatchRating = Math.min(10, Math.floor(
+              (result.playerStats.goals * 2) +
+              (result.playerStats.disposals / 5) +
+              (result.playerStats.tackles / 3)
+          ));
+
+          // Generate teammate interactions (30% chance per teammate, max 3 interactions)
+          if (updatedTeammates.length > 0) {
+              const interactionCount = Math.min(3, updatedTeammates.length);
+              const shuffledTeammates = [...updatedTeammates].sort(() => Math.random() - 0.5);
+
+              for (let i = 0; i < interactionCount; i++) {
+                  const teammate = shuffledTeammates[i];
+                  const interaction = generateTeammateInteraction(
+                      teammate,
+                      playerMatchRating,
+                      won,
+                      currentRound,
+                      updatedPlayer.currentYear || 1
+                  );
+
+                  if (interaction) {
+                      // Update this specific teammate
+                      updatedTeammates = updatedTeammates.map(tm => {
+                          if (tm.id === teammate.id) {
+                              return updateTeammateRelationship(tm, interaction);
+                          }
+                          return tm;
+                      });
+                  }
+              }
+
+              // Increment matchesTogether for all teammates
+              updatedTeammates = updatedTeammates.map(tm => ({
+                  ...tm,
+                  matchesTogether: tm.matchesTogether + 1
+              }));
+
+              // Update team chemistry based on match result
+              if (updatedTeamChemistry) {
+                  updatedTeamChemistry = updateTeamChemistryAfterMatch(
+                      updatedTeamChemistry,
+                      won,
+                      playerMatchRating
+                  );
+              }
+          }
+
+          // Generate coach interaction (40% chance)
+          if (updatedCoachingStaff) {
+              const coachInteraction = generateCoachInteraction(
+                  updatedCoachingStaff.headCoach,
+                  playerMatchRating,
+                  won,
+                  currentRound,
+                  updatedPlayer.currentYear || 1
+              );
+
+              if (coachInteraction) {
+                  // Update head coach relationship
+                  const updatedHeadCoach = updateCoachRelationship(
+                      updatedCoachingStaff.headCoach,
+                      coachInteraction
+                  );
+
+                  updatedCoachingStaff = {
+                      ...updatedCoachingStaff,
+                      headCoach: updatedHeadCoach
+                  };
+
+                  // Apply morale change from coach interaction
+                  updatedPlayer.morale = Math.max(0, Math.min(100,
+                      updatedPlayer.morale + (coachInteraction.playerMoraleChange || 0)
+                  ));
+
+                  // Apply motivation boost if received
+                  if (coachInteraction.motivationGained && coachInteraction.motivationGained > 0) {
+                      motivationBoost = coachInteraction.motivationGained;
+                      motivationExpiry = currentRound + 3; // Lasts 3 rounds
+                  }
+              }
+          }
+
           return {
               ...updatedPlayer,
               nickname: updatedNickname,
               achievements: [...existingAchievements, ...newAchievements],
               mediaReputation: updatedMediaRep,
-              activeCareerEvents
+              activeCareerEvents,
+              teammates: updatedTeammates,
+              teamChemistry: updatedTeamChemistry,
+              coachingStaff: updatedCoachingStaff,
+              motivationBoost,
+              motivationExpiry: motivationExpiry > currentRound ? motivationExpiry : 0
           };
       });
   };
@@ -482,18 +631,20 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const advanceRound = () => {
       // LOGIC: Check if we are transitioning into finals
       const nextRound = currentRound + 1;
-      
+
       let nextFixtures = [...fixtures];
 
       if (currentRound === SEASON_LENGTH) {
-          // End of Regular Season -> Generate Semis
+          // End of Regular Season -> Show Finals Intro
+          setShowFinalsIntro(true);
           nextFixtures = generateSemiFinals(league, fixtures);
       } else if (currentRound === SEASON_LENGTH + 1) {
-          // End of Semis -> Generate Grand Final
+          // End of Semis -> Show Semi Finals Results
+          setShowSemiFinalsResults(true);
           nextFixtures = generateGrandFinal(fixtures);
       } else if (currentRound === SEASON_LENGTH + 2) {
-          // End of Grand Final -> End Season logic (can just stay here for now or loop)
-          // For now, just increment round but no games left
+          // End of Grand Final -> Show Grand Final Result
+          setShowGrandFinalResult(true);
       }
 
       setFixtures(nextFixtures);
@@ -562,8 +713,17 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   promoted = shouldPromote(ladderPosition, prev.contract.tier, playerRating);
                   relegated = shouldRelegate(ladderPosition, prev.contract.tier, playerRating);
 
+                  // Check if won grand final
+                  const grandFinal = fixtures.find(f => f.round === SEASON_LENGTH + 2);
+                  let grandFinalWon = false;
+                  if (grandFinal && grandFinal.played) {
+                      const playerTeamIsHome = grandFinal.homeTeamId === myTeam.id;
+                      const playerTeamScore = playerTeamIsHome ? grandFinal.homeScore : grandFinal.awayScore;
+                      const opponentScore = playerTeamIsHome ? grandFinal.awayScore : grandFinal.homeScore;
+                      grandFinalWon = (playerTeamScore || 0) > (opponentScore || 0);
+                  }
+
                   // Create season history record with awards
-                  const grandFinalWon = false; // TODO: Track if won grand final
                   const seasonRecord = createSeasonHistory(prev, myTeam, promoted, relegated, grandFinalWon);
                   seasonRecord.awards = awards; // Add awards to season history
                   newCareerHistory = [...newCareerHistory, seasonRecord];
@@ -698,6 +858,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               updatedOffers = [...updatedOffers, ...newOffers];
           }
 
+          // Process staff contracts (remove expired temporary/seasonal staff)
+          let updatedCoachingStaff = prev.coachingStaff;
+          if (updatedCoachingStaff) {
+              updatedCoachingStaff = processStaffContracts(updatedCoachingStaff, nextRound);
+          }
+
+          // Update career premiership count if won grand final
+          let updatedCareerStats = prev.careerStats;
+          if (grandFinalWon) {
+              updatedCareerStats = {
+                  ...prev.careerStats,
+                  premierships: prev.careerStats.premierships + 1
+              };
+          }
+
           return {
               ...prev,
               age: newAge,
@@ -705,9 +880,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               currentYear: newCurrentYear,
               seasonsPlayed: newSeasonsPlayed,
               careerHistory: newCareerHistory,
+              careerStats: updatedCareerStats,
               energy: 100, // Restore Energy
               injury: updatedInjury,
-              transferOffers: updatedOffers
+              transferOffers: updatedOffers,
+              coachingStaff: updatedCoachingStaff
           };
       });
 
@@ -1128,6 +1305,34 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 data.player.careerHistory = [];
             }
 
+            // Migration for old saves missing media reputation
+            if (data.player.mediaReputation === undefined) {
+                data.player.mediaReputation = initializeMediaReputation();
+            }
+
+            // Migration for old saves missing team chemistry
+            if (data.player.teammates === undefined || data.player.teamChemistry === undefined) {
+                const playerTeam = data.league.find((t: Team) => t.name === data.player.contract.clubName);
+                if (playerTeam) {
+                    const { teammates, teamChemistry } = initializeTeamChemistry(playerTeam);
+                    data.player.teammates = teammates;
+                    data.player.teamChemistry = teamChemistry;
+                }
+            }
+
+            // Migration for old saves missing coaching staff
+            if (data.player.coachingStaff === undefined) {
+                data.player.coachingStaff = initializeCoachingStaff(data.player.contract.tier);
+            }
+
+            // Migration for old saves missing career events
+            if (data.player.activeCareerEvents === undefined) {
+                data.player.activeCareerEvents = [];
+            }
+            if (data.player.careerEventHistory === undefined) {
+                data.player.careerEventHistory = [];
+            }
+
             setPlayer(data.player);
             setLeague(data.league);
             setFixtures(data.fixtures);
@@ -1305,6 +1510,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
   };
 
+  const hireCoachingStaffFn = (staffMember: any, contractType: 'PERMANENT' | 'TEMPORARY') => {
+      if (!player || !player.coachingStaff) return;
+
+      const { updatedStaff, cost } = hireStaff(player.coachingStaff, staffMember, contractType, currentRound);
+
+      setPlayer(prev => {
+          if (!prev) return null;
+          return {
+              ...prev,
+              coachingStaff: updatedStaff,
+              wallet: (prev.wallet || 0) - cost
+          };
+      });
+  };
+
   const resolveEventChoiceFn = (eventId: string, choiceId: string) => {
       if (!player) return;
 
@@ -1354,9 +1574,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
   }, [player, league, fixtures, currentRound, lastMatchResult, hasAttemptedLoad]);
 
+  const dismissFinalsIntro = () => setShowFinalsIntro(false);
+  const dismissSemiFinalsResults = () => setShowSemiFinalsResults(false);
+  const dismissGrandFinalResult = () => setShowGrandFinalResult(false);
+
   return (
     <GameContext.Provider value={{
-        player, setPlayer, league, fixtures, currentRound, startNewGame, generateMatchSimulation, commitMatchResult, trainAttribute, advanceRound, simulateRound, view, setView, lastMatchResult, saveGame, loadGame, acknowledgeMilestone, retirePlayer, resetGame, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap, seasonAwards, dismissAwardsCeremony, draftClass, draftProspect, simulateDraft, completeDraft, acceptTransfer, rejectTransfer, purchaseItem, respondToMedia: respondToMediaFn, createSocialPost: createSocialPostFn, resolveEvent: resolveEventFn, resolveEventChoice: resolveEventChoiceFn
+        player, setPlayer, league, fixtures, currentRound, startNewGame, generateMatchSimulation, commitMatchResult, trainAttribute, advanceRound, simulateRound, view, setView, lastMatchResult, saveGame, loadGame, acknowledgeMilestone, retirePlayer, resetGame, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap, seasonAwards, dismissAwardsCeremony, draftClass, draftProspect, simulateDraft, completeDraft, acceptTransfer, rejectTransfer, purchaseItem, respondToMedia: respondToMediaFn, createSocialPost: createSocialPostFn, resolveEvent: resolveEventFn, resolveEventChoice: resolveEventChoiceFn, hireCoachingStaff: hireCoachingStaffFn, showFinalsIntro, dismissFinalsIntro, showSemiFinalsResults, dismissSemiFinalsResults, showGrandFinalResult, dismissGrandFinalResult
     }}>
       {children}
     </GameContext.Provider>

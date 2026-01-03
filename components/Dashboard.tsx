@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
-import { Fixture, Milestone } from '../types';
+import { Fixture, Milestone, MediaEvent } from '../types';
 import { SEASON_LENGTH } from '../constants';
 import Avatar from './Avatar';
 import DailyRewardModal from './DailyRewardModal';
 import SeasonRecap from './SeasonRecap';
 import AwardsCeremony from './AwardsCeremony';
+import PostMatchPress from './PostMatchPress';
+import FinalsIntro from './FinalsIntro';
+import SemiFinalsResults from './SemiFinalsResults';
+import GrandFinalResult from './GrandFinalResult';
+import TeamLogo from './TeamLogo';
 import { getDailyRewardForStreak } from '../utils/dailyRewardUtils';
 
 const Dashboard: React.FC = () => {
-  const { player, currentRound, fixtures, league, setView, simulateRound, lastMatchResult, acknowledgeMilestone, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap, seasonAwards, dismissAwardsCeremony } = useGame();
+  const { player, currentRound, fixtures, league, setView, simulateRound, lastMatchResult, acknowledgeMilestone, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap, seasonAwards, dismissAwardsCeremony, respondToMedia, showFinalsIntro, dismissFinalsIntro, showSemiFinalsResults, dismissSemiFinalsResults, showGrandFinalResult, dismissGrandFinalResult } = useGame();
   const [showMilestone, setShowMilestone] = useState<Milestone | null>(null);
   const [showDailyReward, setShowDailyReward] = useState(false);
+  const [showMediaEvent, setShowMediaEvent] = useState<MediaEvent | null>(null);
 
   useEffect(() => {
     if (lastMatchResult && lastMatchResult.achievedMilestones && lastMatchResult.achievedMilestones.length > 0) {
@@ -25,6 +31,24 @@ const Dashboard: React.FC = () => {
       setShowDailyReward(true);
     }
   }, []);
+
+  // Check for unresponded media events
+  useEffect(() => {
+    if (player?.mediaReputation) {
+      const unrespondedEvents = player.mediaReputation.mediaEvents.filter(e => !e.hasResponded);
+      if (unrespondedEvents.length > 0 && !showMediaEvent) {
+        // Show the most recent unresponded event
+        setShowMediaEvent(unrespondedEvents[unrespondedEvents.length - 1]);
+      }
+    }
+  }, [player?.mediaReputation?.mediaEvents]);
+
+  const handleMediaResponse = (responseType: 'HUMBLE' | 'CONFIDENT' | 'IGNORE') => {
+    if (showMediaEvent && respondToMedia) {
+      respondToMedia(showMediaEvent.id, responseType);
+      setShowMediaEvent(null);
+    }
+  };
 
   if (!player) return null;
 
@@ -64,7 +88,16 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="p-4 space-y-6 pb-24 relative">
-      
+
+      {/* Post-Match Press Conference Modal */}
+      {showMediaEvent && (
+        <PostMatchPress
+          event={showMediaEvent}
+          onRespond={handleMediaResponse}
+          playerName={player.name}
+        />
+      )}
+
       {showMilestone && (
           <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 animate-fade-in" onClick={() => { setShowMilestone(null); acknowledgeMilestone(); }}>
                <div className="bg-gradient-to-b from-yellow-600 to-yellow-800 p-1 rounded-2xl shadow-2xl max-w-sm w-full relative overflow-hidden">
@@ -186,6 +219,7 @@ const Dashboard: React.FC = () => {
           </button>
       )}
 
+
       {/* Shop Banner */}
       <button
           onClick={() => setView('SHOP')}
@@ -228,17 +262,13 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div className="flex justify-between items-center mb-6">
                         <div className="flex flex-col items-center w-1/3">
-                            <div className={`w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-2xl font-black border-2 ${isGrandFinal ? 'border-yellow-500' : 'border-slate-600'}`}>
-                                {myTeam?.name.charAt(0)}
-                            </div>
+                            {myTeam && <TeamLogo team={myTeam} size="lg" showBorder={isGrandFinal} />}
                             <span className="mt-2 font-bold text-sm leading-tight">{myTeam?.name}</span>
                             <span className="text-xs text-slate-400">{myTeam?.wins}-{myTeam?.losses}</span>
                         </div>
                         <div className="text-2xl font-black text-slate-500 italic">VS</div>
                         <div className="flex flex-col items-center w-1/3">
-                            <div className={`w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-2xl font-black border-2 ${isGrandFinal ? 'border-yellow-500' : 'border-slate-600'}`}>
-                                {opponent?.name.charAt(0)}
-                            </div>
+                            {opponent && <TeamLogo team={opponent} size="lg" showBorder={isGrandFinal} />}
                             <span className="mt-2 font-bold text-sm leading-tight">{opponent?.name}</span>
                             <span className="text-xs text-slate-400">{opponent?.wins}-{opponent?.losses}</span>
                         </div>
@@ -342,6 +372,37 @@ const Dashboard: React.FC = () => {
           onDismiss={dismissAwardsCeremony}
         />
       )}
+
+      {/* Finals Intro Modal */}
+      {showFinalsIntro && player && (
+        <FinalsIntro
+          player={player}
+          league={league}
+          onContinue={dismissFinalsIntro}
+        />
+      )}
+
+      {/* Semi Finals Results Modal */}
+      {showSemiFinalsResults && (
+        <SemiFinalsResults
+          fixtures={fixtures}
+          league={league}
+          onContinue={dismissSemiFinalsResults}
+        />
+      )}
+
+      {/* Grand Final Result Modal */}
+      {showGrandFinalResult && player && (() => {
+        const grandFinal = fixtures.find(f => f.round === SEASON_LENGTH + 2);
+        return grandFinal ? (
+          <GrandFinalResult
+            fixture={grandFinal}
+            league={league}
+            player={player}
+            onContinue={dismissGrandFinalResult}
+          />
+        ) : null;
+      })()}
     </div>
   );
 };

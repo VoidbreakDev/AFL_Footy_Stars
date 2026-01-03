@@ -44,13 +44,13 @@ export const generateMediaEvent = (
     const won = matchResult.winnerId === matchResult.homeScore.total > matchResult.awayScore.total ? 'home' : 'away';
     const mediaRep = player.mediaReputation || initializeMediaReputation();
 
-    // Determine if event should trigger (30% base chance, higher for standout performances)
-    let eventChance = 0.3;
+    // Determine if event should trigger (60% base chance, higher for standout performances)
+    let eventChance = 0.6; // Increased from 30% to 60%
     const outstandingPerformance = playerStats.goals >= 5 || playerStats.disposals >= 35 || playerStats.votes === 3;
     const poorPerformance = playerStats.disposals < 10 && playerStats.goals === 0;
 
-    if (outstandingPerformance) eventChance = 0.7;
-    if (poorPerformance) eventChance = 0.4;
+    if (outstandingPerformance) eventChance = 0.9; // 90% for great performances
+    if (poorPerformance) eventChance = 0.5; // 50% for poor performances
 
     if (Math.random() > eventChance) return null;
 
@@ -63,7 +63,7 @@ export const generateMediaEvent = (
         fanImpact: number;
         condition: boolean;
     }> = [
-        // Positive events
+        // Positive events (rare/high impact)
         {
             type: 'PRAISE',
             title: 'Outstanding Performance!',
@@ -80,47 +80,80 @@ export const generateMediaEvent = (
             fanImpact: 1500,
             condition: playerStats.disposals >= 35
         },
+        // COMMON POSITIVE EVENTS (trigger frequently)
         {
             type: 'INTERVIEW',
             title: 'Post-Match Interview',
-            description: `${player.name} speaks about the team's ${won ? 'victory' : 'loss'} and their role in the game.`,
-            reputationImpact: won ? 5 : 2,
-            fanImpact: won ? 500 : 200,
-            condition: playerStats.votes > 0
+            description: `${player.name} speaks to the media after ${won ? 'a hard-fought victory' : 'the tough loss'}.`,
+            reputationImpact: won ? 3 : 1,
+            fanImpact: won ? 400 : 150,
+            condition: won // Trigger on ANY win
+        },
+        {
+            type: 'PRESS_CONFERENCE',
+            title: 'Weekly Press Conference',
+            description: `${player.name} addresses the media about their recent form and upcoming challenges.`,
+            reputationImpact: 2,
+            fanImpact: 200,
+            condition: currentRound % 3 === 0 // Every 3 rounds
         },
         {
             type: 'SOCIAL_MEDIA',
             title: 'Social Media Buzz',
-            description: `Fans are going wild on social media after ${player.name}'s performance today!`,
-            reputationImpact: 3,
-            fanImpact: 1000,
-            condition: outstandingPerformance
+            description: `Fans are talking about ${player.name}'s ${playerStats.goals} goal${playerStats.goals > 1 ? 's' : ''} and ${playerStats.disposals} disposal performance!`,
+            reputationImpact: 2,
+            fanImpact: 300,
+            condition: playerStats.goals >= 2 || playerStats.disposals >= 20
         },
-        // Negative events
+        {
+            type: 'INTERVIEW',
+            title: 'Rising Star Spotlight',
+            description: `Media outlets are taking notice of ${player.name}'s consistent performances this season.`,
+            reputationImpact: 4,
+            fanImpact: 600,
+            condition: playerStats.votes > 0
+        },
+        {
+            type: 'SOCIAL_MEDIA',
+            title: 'Big Win Celebration',
+            description: `The locker room celebrations are trending on social media after the team's dominant victory!`,
+            reputationImpact: 3,
+            fanImpact: 500,
+            condition: won && outstandingPerformance
+        },
+        // COMMON NEGATIVE EVENTS
         {
             type: 'CRITICISM',
             title: 'Quiet Game Raises Questions',
             description: `Critics question ${player.name}'s impact after a quiet ${playerStats.disposals} disposal game.`,
-            reputationImpact: -5,
-            fanImpact: -300,
+            reputationImpact: -3,
+            fanImpact: -200,
             condition: poorPerformance && !won
         },
         {
-            type: 'CONTROVERSY',
-            title: 'On-Field Incident',
-            description: `${player.name}'s aggressive play has drawn criticism from commentators and opposition fans.`,
-            reputationImpact: -8,
-            fanImpact: -500,
-            condition: playerStats.tackles >= 10 && Math.random() > 0.7
+            type: 'PRESS_CONFERENCE',
+            title: 'Tough Loss Debrief',
+            description: `${player.name} faces questions from the media after the disappointing result.`,
+            reputationImpact: -1,
+            fanImpact: -100,
+            condition: !won && playerStats.disposals < 15
         },
-        // Neutral events
+        {
+            type: 'CONTROVERSY',
+            title: 'Physical Play Under Scrutiny',
+            description: `${player.name}'s aggressive tackling style has drawn attention from commentators.`,
+            reputationImpact: -2,
+            fanImpact: 100, // Some fans like it!
+            condition: playerStats.tackles >= 8
+        },
+        // NEUTRAL/ROUTINE EVENTS
         {
             type: 'INTERVIEW',
-            title: 'Mid-Season Check-In',
-            description: `${player.name} discusses their season so far and team goals in a candid interview.`,
-            reputationImpact: 2,
-            fanImpact: 300,
-            condition: currentRound === 11
+            title: 'Mid-Week Media Duties',
+            description: `${player.name} fulfills their media obligations with a standard interview about the upcoming match.`,
+            reputationImpact: 1,
+            fanImpact: 100,
+            condition: true // Always possible as fallback
         }
     ];
 

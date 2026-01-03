@@ -35,7 +35,7 @@ export const generateCareerEvent = (
     if (condition === 'HIGH_MEDIA_REP' && (player.mediaReputation?.score || 0) >= 70) return true;
     if (condition === 'GOOD_FORM' && player.morale > 70 && player.energy > 60) return true;
     if (condition === 'AFTER_LOSS' && recentMatchWon === false) return true;
-    if (condition === 'HIGH_STATS' && player.level >= 20) return true;
+    if (condition === 'HIGH_STATS' && player.skillPoints >= 20) return true;
     if (condition === 'INJURY_PRONE' && (player.injury !== null)) return true;
     if (condition === 'FIRST_SEASON' && (player.currentYear || 1) === 1) return true;
 
@@ -119,10 +119,8 @@ export const applyCareerEventEffects = (
     updatedPlayer.energy = Math.max(0, Math.min(100, updatedPlayer.energy + effects.energy));
   }
 
-  // Apply XP bonus
-  if (effects.xp !== undefined) {
-    updatedPlayer.xp += effects.xp;
-  }
+  // XP is no longer used - converted to skill points instead
+  // (XP was intended for a level system that was never implemented)
 
   // Apply skill points
   if (effects.skillPoints !== undefined) {
@@ -326,7 +324,7 @@ export const formatEffectPreview = (effects: CareerEventEffect): string[] => {
 
   if (effects.morale) previews.push(`${effects.morale > 0 ? '+' : ''}${effects.morale} morale`);
   if (effects.energy) previews.push(`${effects.energy > 0 ? '+' : ''}${effects.energy} energy`);
-  if (effects.xp) previews.push(`+${effects.xp} XP`);
+  // XP removed - no longer used
   if (effects.skillPoints) previews.push(`+${effects.skillPoints} skill points`);
   if (effects.wallet) previews.push(`${effects.wallet > 0 ? '+' : ''}$${Math.abs(effects.wallet)}`);
   if (effects.mediaReputation) previews.push(`${effects.mediaReputation > 0 ? '+' : ''}${effects.mediaReputation} media rep`);

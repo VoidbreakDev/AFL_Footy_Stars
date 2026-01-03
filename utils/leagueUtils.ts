@@ -1,5 +1,5 @@
 import { Team, Fixture, LeagueTier, Position, MatchResult, Stadium, PlayerAttributes, AIPlayer } from '../types';
-import { TEAM_NAMES_LOCAL, TEAM_NAMES_STATE, TEAM_NAMES_AFL, FIRST_NAMES, LAST_NAMES, SEASON_LENGTH, STADIUM_TEMPLATES } from '../constants';
+import { TEAM_NAMES_LOCAL, TEAM_NAMES_STATE, TEAM_NAMES_AFL, FIRST_NAMES, LAST_NAMES, SEASON_LENGTH, STADIUM_TEMPLATES, TEAM_LOGOS } from '../constants';
 
 // Generate attributes for AI player based on overall rating and position
 export const generateAIPlayerAttributes = (rating: number, position: Position): PlayerAttributes => {
@@ -160,7 +160,8 @@ export const generateLeague = (tier: LeagueTier): Team[] => {
         ['#9333ea', '#ffffff'], // Purple
         ['#ea580c', '#1e293b'], // Orange
         ['#475569', '#ffffff']  // Slate
-        ][i % 8] as [string, string]
+        ][i % 8] as [string, string],
+        logo: TEAM_LOGOS[name] || name.charAt(0) // Use emoji logo or fallback to first letter
     };
   });
 };

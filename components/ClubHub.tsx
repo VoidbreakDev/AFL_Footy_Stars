@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { useGame } from '../context/GameContext';
 import { Team, LeagueTier, Stadium } from '../types';
 import Avatar from './Avatar';
+import TeamLogo from './TeamLogo';
 
 const ClubHub: React.FC = () => {
-    const { player, setPlayer, league, fixtures, currentRound } = useGame();
+    const { player, setPlayer, setView, league, fixtures, currentRound } = useGame();
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'CONTRACT' | 'HISTORY'>('OVERVIEW');
     const [transferState, setTransferState] = useState<'IDLE' | 'SEARCHING' | 'OFFERS'>('IDLE');
     const [offers, setOffers] = useState<{ team: Team, salary: number, years: number }[]>([]);
@@ -173,9 +174,7 @@ const ClubHub: React.FC = () => {
             >
                 <div className="absolute inset-0 bg-black/30"></div>
                 <div className="relative z-10 flex flex-col items-center text-white">
-                    <div className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-md border-4 border-white/50 flex items-center justify-center text-4xl font-black shadow-xl mb-3">
-                        {myTeam.name.charAt(0)}
-                    </div>
+                    <TeamLogo team={myTeam} size="2xl" className="mb-3" />
                     <h1 className="text-3xl font-black uppercase italic tracking-wider text-center drop-shadow-md">{myTeam.name}</h1>
                     <p className="text-white/80 font-medium text-sm">Est. {teamHistory.foundedYear}</p>
                 </div>
@@ -225,6 +224,61 @@ const ClubHub: React.FC = () => {
                 {/* --- TAB: OVERVIEW --- */}
                 {activeTab === 'OVERVIEW' && (
                     <div className="animate-fade-in">
+                        {/* Team Management Buttons */}
+                        <div className="grid grid-cols-2 gap-3 mb-6">
+                            {/* Team Chemistry */}
+                            {player.teamChemistry && (
+                                <button
+                                    onClick={() => setView('TEAM_CHEMISTRY')}
+                                    className="bg-gradient-to-br from-cyan-900/40 to-blue-900/40 border-2 border-cyan-500/30 p-4 rounded-xl shadow-lg hover:border-cyan-400 transition-all"
+                                >
+                                    <div className="text-center">
+                                        <div className="text-3xl mb-2">🤝</div>
+                                        <h3 className="font-bold text-cyan-400 uppercase text-xs mb-1">Team Chemistry</h3>
+                                        <div className={`text-2xl font-black ${
+                                            player.teamChemistry.overallChemistry >= 70 ? 'text-green-400' :
+                                            player.teamChemistry.overallChemistry >= 50 ? 'text-blue-400' :
+                                            player.teamChemistry.overallChemistry >= 30 ? 'text-yellow-400' :
+                                            'text-orange-400'
+                                        }`}>
+                                            {player.teamChemistry.overallChemistry}
+                                        </div>
+                                        <p className="text-cyan-300 text-xs mt-1">
+                                            {player.teamChemistry.recentForm === 'HOT' && '🔥 On Fire!'}
+                                            {player.teamChemistry.recentForm === 'WARM' && '⬆️ Building'}
+                                            {player.teamChemistry.recentForm === 'NEUTRAL' && '➡️ Steady'}
+                                            {player.teamChemistry.recentForm === 'COLD' && '⬇️ Cooling'}
+                                            {player.teamChemistry.recentForm === 'FREEZING' && '❄️ Struggling'}
+                                        </p>
+                                    </div>
+                                </button>
+                            )}
+
+                            {/* Coaching Staff */}
+                            {player.coachingStaff && (
+                                <button
+                                    onClick={() => setView('COACHING_STAFF')}
+                                    className="bg-gradient-to-br from-amber-900/40 to-orange-900/40 border-2 border-amber-500/30 p-4 rounded-xl shadow-lg hover:border-amber-400 transition-all"
+                                >
+                                    <div className="text-center">
+                                        <div className="text-3xl mb-2">👔</div>
+                                        <h3 className="font-bold text-amber-400 uppercase text-xs mb-1">Coaching Staff</h3>
+                                        <div className={`text-2xl font-black ${
+                                            player.coachingStaff.staffRating >= 80 ? 'text-green-400' :
+                                            player.coachingStaff.staffRating >= 60 ? 'text-blue-400' :
+                                            player.coachingStaff.staffRating >= 40 ? 'text-yellow-400' :
+                                            'text-orange-400'
+                                        }`}>
+                                            {player.coachingStaff.staffRating}
+                                        </div>
+                                        <p className="text-amber-300 text-xs mt-1">
+                                            +{player.coachingStaff.trainingBonus}% Training
+                                        </p>
+                                    </div>
+                                </button>
+                            )}
+                        </div>
+
                         {/* Stadium & Coach Grid */}
                         <div className="grid gap-4 mb-6">
                             <StadiumVisual stadium={myTeam.stadium} />
@@ -233,7 +287,9 @@ const ClubHub: React.FC = () => {
                                 <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-xl">👨‍💼</div>
                                 <div>
                                     <div className="text-xs text-slate-400 uppercase font-bold">Senior Coach</div>
-                                    <div className="text-white font-bold">{myTeam.coach}</div>
+                                    <div className="text-white font-bold">
+                                        {player.coachingStaff?.headCoach?.name || myTeam.coach}
+                                    </div>
                                 </div>
                             </div>
                         </div>

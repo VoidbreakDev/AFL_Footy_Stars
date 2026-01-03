@@ -1,18 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGameContext } from '../context/GameContext';
 import { Coach, StaffMember } from '../types';
 import {
   getCoachPersonalityIcon,
   getStaffRoleIcon,
-  getCoachRelationshipColor
+  getCoachRelationshipColor,
+  generateAvailableStaff
 } from '../utils/coachingUtils';
 import { COACH_PERSONALITY_EFFECTS } from '../constants';
 
 const CoachingStaff: React.FC = () => {
-  const { player, setView } = useGameContext();
-  const [selectedTab, setSelectedTab] = useState<'OVERVIEW' | 'COACHES' | 'STAFF'>('OVERVIEW');
+  const { player, setView, hireCoachingStaff, currentRound } = useGameContext();
+  const [selectedTab, setSelectedTab] = useState<'OVERVIEW' | 'COACHES' | 'STAFF' | 'HIRE'>('OVERVIEW');
   const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+  const [availableStaff, setAvailableStaff] = useState<StaffMember[]>([]);
 
   if (!player || !player.coachingStaff) {
     return (
@@ -35,6 +37,31 @@ const CoachingStaff: React.FC = () => {
   }
 
   const staff = player.coachingStaff;
+
+  // Generate available staff when HIRE tab is opened
+  useEffect(() => {
+    if (selectedTab === 'HIRE' && availableStaff.length === 0) {
+      const newStaff = generateAvailableStaff(player.contract.tier, 6);
+      setAvailableStaff(newStaff);
+    }
+  }, [selectedTab, player.contract.tier]);
+
+  const handleHire = (staffMember: StaffMember, contractType: 'PERMANENT' | 'TEMPORARY') => {
+    const cost = contractType === 'TEMPORARY' ? staffMember.weeklyCost! : staffMember.seasonCost!;
+
+    if (player.wallet! < cost) {
+      alert(`Not enough money! Need $${cost.toLocaleString()}, have $${player.wallet!.toLocaleString()}`);
+      return;
+    }
+
+    if (hireCoachingStaff) {
+      hireCoachingStaff(staffMember, contractType);
+      // Regenerate available staff
+      const newStaff = generateAvailableStaff(player.contract.tier, 6);
+      setAvailableStaff(newStaff);
+      setSelectedTab('STAFF'); // Switch to staff tab to see new hire
+    }
+  };
 
   const renderOverview = () => {
     return (
@@ -268,6 +295,86 @@ const CoachingStaff: React.FC = () => {
     );
   };
 
+  const renderHireStaff = () => {
+    return (
+      <div className="space-y-4">
+        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-4 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="text-2xl">💰</div>
+            <div>
+              <h3 className="font-bold text-yellow-400">Your Budget</h3>
+              <p className="text-white text-xl font-black">${(player.wallet || 0).toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+
+        <h3 className="text-xl font-bold mb-4">Available Staff</h3>
+        <div className="grid gap-3">
+          {availableStaff.map(staffMember => (
+            <div
+              key={staffMember.id}
+              className="bg-gray-800 border border-gray-700 rounded-xl p-4 hover:border-green-500 transition-all"
+            >
+              <div className="flex items-start gap-4">
+                <div className="text-4xl">{getStaffRoleIcon(staffMember.role)}</div>
+                <div className="flex-1">
+                  <div className="font-bold text-white mb-1">{staffMember.name}</div>
+                  <div className="text-sm text-gray-400 mb-2">{staffMember.role.replace(/_/g, ' ')}</div>
+                  <div className="grid grid-cols-3 gap-2 text-xs mb-3">
+                    <div>
+                      <span className="text-gray-500">Expertise:</span>
+                      <span className={`ml-1 font-bold ${
+                        staffMember.expertise >= 80 ? 'text-green-400' :
+                        staffMember.expertise >= 60 ? 'text-blue-400' :
+                        staffMember.expertise >= 40 ? 'text-yellow-400' : 'text-orange-400'
+                      }`}>{staffMember.expertise}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Experience:</span>
+                      <span className="ml-1 font-bold text-white">{staffMember.experience}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Effect Power:</span>
+                      <span className="ml-1 font-bold text-green-400">{staffMember.effectPower}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleHire(staffMember, 'TEMPORARY')}
+                      className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold transition-all"
+                      disabled={(player.wallet || 0) < staffMember.weeklyCost!}
+                    >
+                      <div>Hire for 1 Week</div>
+                      <div className="text-xs">${staffMember.weeklyCost!.toLocaleString()}</div>
+                    </button>
+                    <button
+                      onClick={() => handleHire(staffMember, 'PERMANENT')}
+                      className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-bold transition-all"
+                      disabled={(player.wallet || 0) < staffMember.seasonCost!}
+                    >
+                      <div>Hire for Season</div>
+                      <div className="text-xs">${staffMember.seasonCost!.toLocaleString()}</div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={() => {
+            const newStaff = generateAvailableStaff(player.contract.tier, 6);
+            setAvailableStaff(newStaff);
+          }}
+          className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold transition-all"
+        >
+          🔄 Refresh Available Staff
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-6">
       <div className="max-w-6xl mx-auto">
@@ -316,12 +423,23 @@ const CoachingStaff: React.FC = () => {
           >
             Staff ({staff.fitnessStaff.length + staff.medicalStaff.length + (staff.mentalCoach ? 1 : 0)})
           </button>
+          <button
+            onClick={() => setSelectedTab('HIRE')}
+            className={`px-6 py-3 rounded-lg font-bold transition-all ${
+              selectedTab === 'HIRE'
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            💼 Hire Staff
+          </button>
         </div>
 
         {/* Content */}
         {selectedTab === 'OVERVIEW' && renderOverview()}
         {selectedTab === 'COACHES' && renderCoachesList()}
         {selectedTab === 'STAFF' && renderStaffList()}
+        {selectedTab === 'HIRE' && renderHireStaff()}
       </div>
     </div>
   );

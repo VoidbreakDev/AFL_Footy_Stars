@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { SEASON_LENGTH } from '../constants';
+import TeamLogo from './TeamLogo';
 
 const LeagueView: React.FC = () => {
   const { league, player, fixtures, currentRound } = useGame();
@@ -67,12 +68,7 @@ const LeagueView: React.FC = () => {
                                <tr key={team.id} className={team.name === player.contract.clubName ? 'bg-emerald-900/20' : ''}>
                                    <td className="p-3 font-bold text-slate-500 border-r border-slate-700/50">{index + 1}</td>
                                    <td className="p-3 font-bold text-white flex items-center gap-2">
-                                       <div 
-                                            className="w-4 h-4 rounded-full border border-slate-600 flex items-center justify-center text-[8px]"
-                                            style={{ backgroundColor: team.colors[0], color: team.colors[1] }}
-                                       >
-                                           {team.name.charAt(0)}
-                                       </div>
+                                       <TeamLogo team={team} size="xs" showBorder={false} />
                                        {team.name}
                                    </td>
                                    <td className="p-3 text-center text-slate-400">{team.wins + team.losses + team.draws}</td>
@@ -123,9 +119,7 @@ const LeagueView: React.FC = () => {
                                    <div className="flex items-center justify-between">
                                        {/* Home Team */}
                                        <div className="flex-1 flex flex-col items-center gap-1">
-                                           <div className="w-10 h-10 rounded-full border-2 border-slate-600 shadow-sm flex items-center justify-center font-bold text-sm" style={{ backgroundColor: home.colors[0], color: home.colors[1] }}>
-                                               {home.name.charAt(0)}
-                                           </div>
+                                           <TeamLogo team={home} size="sm" />
                                            <span className="text-xs font-bold text-center leading-tight">{home.name}</span>
                                            {fix.played && fix.result && (
                                                <span className={`text-xs ${fix.result.winnerId === home.id ? 'text-emerald-400 font-bold' : 'text-slate-400'}`}>
@@ -145,9 +139,7 @@ const LeagueView: React.FC = () => {
 
                                        {/* Away Team */}
                                        <div className="flex-1 flex flex-col items-center gap-1">
-                                           <div className="w-10 h-10 rounded-full border-2 border-slate-600 shadow-sm flex items-center justify-center font-bold text-sm" style={{ backgroundColor: away.colors[0], color: away.colors[1] }}>
-                                               {away.name.charAt(0)}
-                                           </div>
+                                           <TeamLogo team={away} size="sm" />
                                            <span className="text-xs font-bold text-center leading-tight">{away.name}</span>
                                            {fix.played && fix.result && (
                                                <span className={`text-xs ${fix.result.winnerId === away.id ? 'text-emerald-400 font-bold' : 'text-slate-400'}`}>

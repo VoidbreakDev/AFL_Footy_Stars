@@ -2,13 +2,15 @@
 import React from 'react';
 import { useGame } from '../context/GameContext';
 import { PlayerAttributes } from '../types';
+import { getAvailableMasterSkills } from '../utils/masterSkillUtils';
 
 const Training: React.FC = () => {
-  const { player, trainAttribute } = useGame();
+  const { player, trainAttribute, setView } = useGame();
 
   if (!player) return null;
 
   const attributes: (keyof PlayerAttributes)[] = ['kicking', 'handball', 'tackling', 'marking', 'speed', 'stamina', 'goalSense'];
+  const availableSkills = getAvailableMasterSkills(player);
 
   // Calculate Fatigue Level for color coding
   const fatigueLevel = player.energy;
@@ -47,6 +49,30 @@ const Training: React.FC = () => {
               )}
           </div>
       </div>
+
+      {/* Master Skills CTA */}
+      <button
+          onClick={() => setView('MASTER_SKILLS')}
+          className="w-full bg-gradient-to-r from-yellow-900/40 to-orange-900/40 border-2 border-yellow-500/50 p-4 rounded-xl mb-6 shadow-lg hover:border-yellow-400 transition-all group"
+      >
+          <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                  <div className="text-4xl">⚡</div>
+                  <div className="text-left">
+                      <h3 className="font-black text-yellow-400 uppercase text-sm">Master Skill Tree</h3>
+                      <p className="text-yellow-300 text-xs">
+                          {player.masterSkills?.length || 0} Unlocked · {player.xp.toLocaleString()} XP
+                      </p>
+                      {availableSkills.length > 0 && (
+                          <p className="text-green-400 text-xs font-bold mt-1 animate-pulse">
+                              {availableSkills.length} skill{availableSkills.length > 1 ? 's' : ''} ready to unlock!
+                          </p>
+                      )}
+                  </div>
+              </div>
+              <div className="text-2xl group-hover:translate-x-1 transition-transform">→</div>
+          </div>
+      </button>
 
       {/* Potential Cap Visualization */}
       <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 mb-6 flex justify-between items-center">

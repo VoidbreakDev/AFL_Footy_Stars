@@ -71,6 +71,26 @@ export interface UnlockedAchievement {
   season: number;
 }
 
+export interface MasterSkill {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: keyof PlayerAttributes; // Which attribute this skill belongs to
+  prerequisiteLevel: number; // Required attribute level to unlock
+  xpCost: number; // XP required to unlock
+  spCost: number; // Skill Points required to unlock
+  effectType: 'MATCH_BONUS' | 'HIGHLIGHT_UNLOCK' | 'ATTRIBUTE_MULTIPLIER';
+  effectValue: number; // Strength of the effect
+  rarity: 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
+}
+
+export interface UnlockedMasterSkill {
+  skillId: string;
+  unlockRound: number;
+  unlockYear: number;
+}
+
 export interface DailyReward {
   lastClaimDate: string; // ISO date string
   streak: number;
@@ -186,6 +206,9 @@ export interface PlayerProfile {
   coachingEvents?: CoachingEvent[]; // Active coaching interactions
   motivationBoost?: number; // Temporary performance boost from coaching (%)
   motivationExpiry?: number; // Round when motivation boost expires
+
+  // Master Skill Tree
+  masterSkills?: UnlockedMasterSkill[]; // Unlocked master skills
 }
 
 export interface SeasonHistory {
@@ -251,6 +274,7 @@ export interface Team {
   coach: string;
   stadium: Stadium; // Replaced string homeGround with Stadium object
   colors: [string, string];
+  logo?: string; // Emoji or image URL for team logo
 }
 
 export interface MatchEvent {
@@ -584,6 +608,12 @@ export interface StaffMember {
   relationship: number; // 0-100
 
   yearsAtClub: number;
+
+  // Contract details (for hired staff)
+  contractType?: 'PERMANENT' | 'TEMPORARY'; // Permanent (full season) or Temporary (weekly)
+  contractExpiry?: number; // Round when contract expires (for temporary staff)
+  weeklyCost?: number; // Cost per week for temporary contracts
+  seasonCost?: number; // One-time cost for permanent contracts
 }
 
 export interface CoachInteraction {
