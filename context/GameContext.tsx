@@ -29,8 +29,10 @@ interface GameContextType {
   trainAttribute: (attr: keyof PlayerProfile['attributes']) => void;
   advanceRound: () => void;
   simulateRound: () => void; // New function for injured players to skip match
-  view: 'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' | 'MILESTONES' | 'PLAYER_COMPARISON' | 'TRANSFER_MARKET' | 'SHOP' | 'SETTINGS' | 'CAREER_SUMMARY' | 'DRAFT' | 'MEDIA_HUB' | 'CAREER_EVENTS' | 'TEAM_CHEMISTRY' | 'COACHING_STAFF' | 'MASTER_SKILLS';
+  view: 'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' | 'MILESTONES' | 'PLAYER_COMPARISON' | 'TRANSFER_MARKET' | 'SHOP' | 'SETTINGS' | 'CAREER_SUMMARY' | 'DRAFT' | 'MEDIA_HUB' | 'CAREER_EVENTS' | 'TEAM_CHEMISTRY' | 'COACHING_STAFF' | 'MASTER_SKILLS' | 'SLOT_SELECT';
   setView: React.Dispatch<React.SetStateAction<any>>;
+  currentSlot: number;
+  setCurrentSlot: React.Dispatch<React.SetStateAction<number>>;
   lastMatchResult: MatchResult | null;
   saveGame: () => void;
   loadGame: () => boolean;
@@ -53,7 +55,7 @@ interface GameContextType {
   respondToMedia?: (eventId: string, responseType: 'HUMBLE' | 'CONFIDENT' | 'IGNORE') => void;
   createSocialPost?: (content: string) => void;
   resolveEvent: (eventId: string) => void;
-  resolveEventChoice: (eventId: string) => void;
+  resolveEventChoice: (eventId: string, choiceId?: string) => void;
   hireCoachingStaff?: (staffMember: any, contractType: 'PERMANENT' | 'TEMPORARY') => void;
   showFinalsIntro: boolean;
   dismissFinalsIntro: () => void;
@@ -65,12 +67,16 @@ interface GameContextType {
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
+const SAVE_KEY = (slot: number) => `footyLegendSave_slot${slot}`;
+const LEGACY_SAVE_KEY = 'footyLegendSave';
+
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [player, setPlayer] = useState<PlayerProfile | null>(null);
+  const [currentSlot, setCurrentSlot] = useState<number>(0);
   const [league, setLeague] = useState<Team[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [currentRound, setCurrentRound] = useState(1);
-  const [view, setView] = useState<'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' | 'MILESTONES' | 'PLAYER_COMPARISON' | 'TRANSFER_MARKET' | 'SHOP' | 'SETTINGS' | 'CAREER_SUMMARY' | 'DRAFT' | 'MEDIA_HUB' | 'CAREER_EVENTS' | 'TEAM_CHEMISTRY' | 'COACHING_STAFF' | 'MASTER_SKILLS'>('ONBOARDING');
+  const [view, setView] = useState<'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' | 'MILESTONES' | 'PLAYER_COMPARISON' | 'TRANSFER_MARKET' | 'SHOP' | 'SETTINGS' | 'CAREER_SUMMARY' | 'DRAFT' | 'MEDIA_HUB' | 'CAREER_EVENTS' | 'TEAM_CHEMISTRY' | 'COACHING_STAFF' | 'MASTER_SKILLS' | 'SLOT_SELECT'>('SLOT_SELECT');
   const [lastMatchResult, setLastMatchResult] = useState<MatchResult | null>(null);
   const [showSeasonRecap, setShowSeasonRecap] = useState(false);
   const [seasonAwards, setSeasonAwards] = useState<Award[]>([]);
@@ -690,8 +696,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
               // Check if player is eligible for AFL draft (from State League)
               if (shouldHoldDraft(prev.contract.tier) && isPlayerDraftEligible(prev)) {
-                  // TODO: We need AFL league teams for draft picks
-                  // For now, generate a temporary AFL league for draft purposes
+                  // Generate a temporary AFL league for draft pick assignment
                   const aflLeague = generateLeague(LeagueTier.NATIONAL);
                   const draft = generateDraftClassWithPlayer(newCurrentYear, prev, aflLeague);
                   setDraftClass(draft);
@@ -1001,7 +1006,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastMatchResult
     };
     try {
-      localStorage.setItem('footyLegendSave', JSON.stringify(gameState));
+      localStorage.setItem(SAVE_KEY(currentSlot), JSON.stringify(gameState));
     } catch (e) {
       console.error("Failed to save game", e);
     }
@@ -1023,7 +1028,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           lastMatchResult
       };
       try {
-          localStorage.setItem('footyLegendSave', JSON.stringify(gameState));
+          localStorage.setItem(SAVE_KEY(currentSlot), JSON.stringify(gameState));
       } catch (e) {
           console.error("Failed to save retirement", e);
       }
@@ -1032,13 +1037,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetGame = () => {
-      localStorage.removeItem('footyLegendSave');
+      localStorage.removeItem(SAVE_KEY(currentSlot));
       setPlayer(null);
       setLeague([]);
       setFixtures([]);
       setCurrentRound(1);
       setLastMatchResult(null);
-      setView('ONBOARDING');
+      setView('SLOT_SELECT');
   };
 
   const dismissSeasonRecap = () => {
@@ -1274,7 +1279,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadGame = () => {
     try {
-      const saved = localStorage.getItem('footyLegendSave');
+      // Migrate legacy save to slot 0 on first run
+      const legacy = localStorage.getItem(LEGACY_SAVE_KEY);
+      if (legacy && !localStorage.getItem(SAVE_KEY(0))) {
+        localStorage.setItem(SAVE_KEY(0), legacy);
+        localStorage.removeItem(LEGACY_SAVE_KEY);
+      }
+
+      const saved = localStorage.getItem(SAVE_KEY(currentSlot));
       if (saved) {
         const data = JSON.parse(saved);
         if (data.player && data.league && data.fixtures) {
@@ -1545,11 +1557,23 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
   };
 
-  // Auto-load save file on mount
+  // Auto-load save file on mount — show slot select; loadGame is called from SlotSelect
   useEffect(() => {
       if (!hasAttemptedLoad) {
           setHasAttemptedLoad(true);
-          loadGame();
+          // Attempt to auto-load slot 0 for backward compatibility
+          // If no save exists, stay on SLOT_SELECT
+          const legacy = localStorage.getItem(LEGACY_SAVE_KEY);
+          if (legacy && !localStorage.getItem(SAVE_KEY(0))) {
+              localStorage.setItem(SAVE_KEY(0), legacy);
+              localStorage.removeItem(LEGACY_SAVE_KEY);
+          }
+          const hasSave = !!localStorage.getItem(SAVE_KEY(0));
+          if (!hasSave) {
+              setView('SLOT_SELECT');
+          } else {
+              loadGame();
+          }
       }
   }, []);
 
@@ -1566,7 +1590,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               lastMatchResult
           };
           try {
-              localStorage.setItem('footyLegendSave', JSON.stringify(gameState));
+              localStorage.setItem(SAVE_KEY(currentSlot), JSON.stringify(gameState));
               console.log('Game auto-saved successfully');
           } catch (e) {
               console.error("Failed to auto-save game", e);
@@ -1580,7 +1604,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <GameContext.Provider value={{
-        player, setPlayer, league, fixtures, currentRound, startNewGame, generateMatchSimulation, commitMatchResult, trainAttribute, advanceRound, simulateRound, view, setView, lastMatchResult, saveGame, loadGame, acknowledgeMilestone, retirePlayer, resetGame, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap, seasonAwards, dismissAwardsCeremony, draftClass, draftProspect, simulateDraft, completeDraft, acceptTransfer, rejectTransfer, purchaseItem, respondToMedia: respondToMediaFn, createSocialPost: createSocialPostFn, resolveEvent: resolveEventFn, resolveEventChoice: resolveEventChoiceFn, hireCoachingStaff: hireCoachingStaffFn, showFinalsIntro, dismissFinalsIntro, showSemiFinalsResults, dismissSemiFinalsResults, showGrandFinalResult, dismissGrandFinalResult
+        player, setPlayer, league, fixtures, currentRound, startNewGame, generateMatchSimulation, commitMatchResult, trainAttribute, advanceRound, simulateRound, view, setView, lastMatchResult, saveGame, loadGame, acknowledgeMilestone, retirePlayer, resetGame, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap, seasonAwards, dismissAwardsCeremony, draftClass, draftProspect, simulateDraft, completeDraft, acceptTransfer, rejectTransfer, purchaseItem, respondToMedia: respondToMediaFn, createSocialPost: createSocialPostFn, resolveEvent: resolveEventFn, resolveEventChoice: resolveEventChoiceFn, hireCoachingStaff: hireCoachingStaffFn, showFinalsIntro, dismissFinalsIntro, showSemiFinalsResults, dismissSemiFinalsResults, showGrandFinalResult, dismissGrandFinalResult, currentSlot, setCurrentSlot
     }}>
       {children}
     </GameContext.Provider>

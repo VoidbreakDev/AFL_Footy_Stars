@@ -7,10 +7,10 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-    const { view, setView } = useGame();
+    const { view, setView, currentSlot } = useGame();
 
     // Views where the nav should slide off-screen
-    const hiddenNavViews = ['ONBOARDING', 'MATCH_PREVIEW', 'MATCH_SIM', 'MATCH_RESULT'];
+    const hiddenNavViews = ['ONBOARDING', 'MATCH_PREVIEW', 'MATCH_SIM', 'MATCH_RESULT', 'SLOT_SELECT'];
     const isNavHidden = hiddenNavViews.includes(view);
 
     // Group match views to prevent unmounting/remounting which destroys MatchSim local state
@@ -34,9 +34,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </main>
 
             {/* Bottom Navigation */}
-            <div 
+            <div
                 className={`fixed bottom-0 left-0 w-full bg-slate-950 border-t border-slate-800 h-20 z-50 max-w-md mx-auto left-0 right-0 transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${isNavHidden ? 'translate-y-full' : 'translate-y-0'}`}
             >
+                {/* Slot badge */}
+                {!isNavHidden && (
+                  <div className="absolute top-1 right-2 text-white/20 text-[9px] font-semibold select-none">
+                    Career {currentSlot + 1}
+                  </div>
+                )}
                 <div className="grid grid-cols-5 h-full relative">
                     
                     <button onClick={() => setView('TRAINING')} className={navClass(view === 'TRAINING')}>
