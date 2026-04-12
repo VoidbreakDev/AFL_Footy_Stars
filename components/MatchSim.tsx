@@ -50,6 +50,7 @@ const MatchSim: React.FC = () => {
   const { player, currentRound, fixtures, league, generateMatchSimulation, commitMatchResult, view, setView, advanceRound, lastMatchResult } = useGame();
   const [simStep, setSimStep] = useState(0); // 0=Preview, 1=Q1, 2=Q2, 3=Q3, 4=Q4, 5=Result
   const [resultPage, setResultPage] = useState(1); // 1=Overview, 2=PersonalStats
+  const [activeResultTab, setActiveResultTab] = useState<'stats' | 'highlights'>('stats');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
@@ -513,11 +514,55 @@ const MatchSim: React.FC = () => {
 
               {resultPage === 2 && (
                   <div className="animate-fade-in flex flex-col h-full">
-                      <div className="text-center mb-6">
+                      <div className="text-center mb-4">
                           <h2 className="text-2xl font-black text-white uppercase italic">Performance</h2>
                           <p className="text-slate-400 text-sm">Your impact on the game</p>
                       </div>
 
+                      {/* Tab Toggle */}
+                      <div className="flex bg-slate-800 rounded-xl p-1 mb-4 border border-slate-700">
+                          <button
+                              onClick={() => setActiveResultTab('stats')}
+                              className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${activeResultTab === 'stats' ? 'bg-emerald-500 text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
+                          >
+                              Stats
+                          </button>
+                          <button
+                              onClick={() => setActiveResultTab('highlights')}
+                              className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${activeResultTab === 'highlights' ? 'bg-emerald-500 text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
+                          >
+                              Highlights
+                          </button>
+                      </div>
+
+                      {activeResultTab === 'highlights' ? (
+                          <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+                              {(lastMatchResult.highlights && lastMatchResult.highlights.length > 0) ? lastMatchResult.highlights.map((h, i) => {
+                                  const icons: Record<string, string> = {
+                                      GOAL: '⚽', MARK: '🙌', TACKLE: '💪', DISPOSAL: '🏉', INJURY: '🤕',
+                                      RIVALRY: '🤬', ONE_ON_ONE: '⚡', ONE_ON_ONE_DEFENSIVE: '🛡️',
+                                      HIT_OUT: '✊', INTERCEPT: '🦅',
+                                  };
+                                  const icon = icons[h.type] ?? '🏆';
+                                  return (
+                                      <div key={i} className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex items-start gap-3">
+                                          <div className="text-2xl flex-shrink-0">{icon}</div>
+                                          <div className="flex-1 min-w-0">
+                                              <div className="text-emerald-400 font-bold text-xs uppercase tracking-wider mb-1">{h.type.replace(/_/g, ' ')}</div>
+                                              <div className="text-white text-sm leading-snug">{h.description}</div>
+                                              {h.quarter && <div className="text-slate-500 text-xs mt-1">Q{h.quarter}</div>}
+                                          </div>
+                                      </div>
+                                  );
+                              }) : (
+                                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                                      <div className="text-4xl mb-3">🏉</div>
+                                      <div className="text-sm font-bold uppercase">No highlights this game</div>
+                                  </div>
+                              )}
+                          </div>
+                      ) : (
+                      <>
                       <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 mb-6 shadow-xl">
                           <div className="flex items-center justify-center mb-6">
                                <div className="w-20 h-20 rounded-full border-4 border-emerald-500 overflow-hidden shadow-lg">
@@ -603,7 +648,10 @@ const MatchSim: React.FC = () => {
                           ))}
                       </div>
 
-                      <button 
+                      </>
+                      )}
+
+                      <button
                         onClick={advanceRound}
                         className="w-full py-4 bg-emerald-500 text-slate-900 font-black text-xl rounded-xl uppercase tracking-widest shadow-lg shadow-emerald-900/50 mt-4 hover:bg-emerald-400 active:scale-95 transition-all"
                       >

@@ -350,8 +350,22 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
       });
       
-      // Result update with milestones
-      const resultWithMilestones = { ...result, achievedMilestones };
+      // Select top 5 highlights from the timeline
+      const selectHighlights = (events: MatchEvent[]): MatchEvent[] => {
+          const priority = (e: MatchEvent): number => {
+              if (e.type === 'GOAL' && e.isPlayerInvolved) return 10;
+              if (e.type === 'INJURY') return 8;
+              if (e.type === 'RIVALRY') return 7;
+              if ((e.type === 'MARK' || e.type === 'TACKLE') && e.isPlayerInvolved) return 6;
+              if (e.isPlayerInvolved) return 4;
+              return 1;
+          };
+          return [...events].sort((a, b) => priority(b) - priority(a)).slice(0, 5);
+      };
+      const highlights = selectHighlights(result.timeline ?? []);
+
+      // Result update with milestones and highlights
+      const resultWithMilestones = { ...result, achievedMilestones, highlights };
 
 
       // 2. Update Player's Match
