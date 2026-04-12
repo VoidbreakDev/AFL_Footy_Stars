@@ -696,6 +696,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           let newCareerHistory = prev.careerHistory || [];
           let promoted = false;
           let relegated = false;
+          let grandFinalWon = false;
 
           if (seasonEnded) {
               newAge = prev.age + 1;
@@ -735,7 +736,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                   // Check if won grand final
                   const grandFinal = fixtures.find(f => f.round === SEASON_LENGTH + 2);
-                  let grandFinalWon = false;
                   if (grandFinal && grandFinal.played) {
                       const playerTeamIsHome = grandFinal.homeTeamId === myTeam.id;
                       const playerTeamScore = playerTeamIsHome ? grandFinal.homeScore : grandFinal.awayScore;
