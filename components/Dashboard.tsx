@@ -373,7 +373,7 @@ const Dashboard: React.FC = () => {
 
       {/* First-Round Guide Overlay (shown after daily login for new players) */}
       {guideStep !== null && (
-        <div className="fixed inset-0 bg-black/75 z-50 flex items-end justify-center p-6">
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-6 pb-24">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <div className="text-xs text-slate-500 mb-1 uppercase tracking-widest">Step {guideStep} of 3</div>
             {guideStep === 1 && (
