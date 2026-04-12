@@ -35,20 +35,11 @@ const SlotSelect: React.FC = () => {
 
   const handleSelectSlot = (slot: number) => {
     setCurrentSlot(slot);
-    // loadGame reads currentSlot — give state a tick to update then load
-    // We replicate the load logic inline to avoid stale closure issue
-    try {
-      const raw = localStorage.getItem(SAVE_KEY(slot));
-      if (raw) {
-        // Slot has a save — trigger a real load through context after slot is set
-        // Use a small timeout so setCurrentSlot flushes first
-        setTimeout(() => {
-          loadGame();
-        }, 0);
-      } else {
-        setView('ONBOARDING');
-      }
-    } catch {
+    const hasSave = !!localStorage.getItem(SAVE_KEY(slot));
+    if (hasSave) {
+      // Pass slot directly — avoids stale closure on currentSlot state
+      loadGame(slot);
+    } else {
       setView('ONBOARDING');
     }
   };

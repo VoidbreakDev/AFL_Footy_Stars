@@ -35,7 +35,7 @@ interface GameContextType {
   setCurrentSlot: React.Dispatch<React.SetStateAction<number>>;
   lastMatchResult: MatchResult | null;
   saveGame: () => void;
-  loadGame: () => boolean;
+  loadGame: (slotOverride?: number) => boolean;
   acknowledgeMilestone: () => void;
   retirePlayer: () => void;
   canClaimReward: () => boolean;
@@ -1292,7 +1292,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
   };
 
-  const loadGame = () => {
+  const loadGame = (slotOverride?: number) => {
+    const slot = slotOverride !== undefined ? slotOverride : currentSlot;
     try {
       // Migrate legacy save to slot 0 on first run
       const legacy = localStorage.getItem(LEGACY_SAVE_KEY);
@@ -1301,7 +1302,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem(LEGACY_SAVE_KEY);
       }
 
-      const saved = localStorage.getItem(SAVE_KEY(currentSlot));
+      const saved = localStorage.getItem(SAVE_KEY(slot));
       if (saved) {
         const data = JSON.parse(saved);
         if (data.player && data.league && data.fixtures) {
@@ -1572,23 +1573,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
   };
 
-  // Auto-load save file on mount — show slot select; loadGame is called from SlotSelect
+  // On mount: migrate legacy save then always show SLOT_SELECT so the user picks a slot
   useEffect(() => {
       if (!hasAttemptedLoad) {
           setHasAttemptedLoad(true);
-          // Attempt to auto-load slot 0 for backward compatibility
-          // If no save exists, stay on SLOT_SELECT
           const legacy = localStorage.getItem(LEGACY_SAVE_KEY);
           if (legacy && !localStorage.getItem(SAVE_KEY(0))) {
               localStorage.setItem(SAVE_KEY(0), legacy);
               localStorage.removeItem(LEGACY_SAVE_KEY);
           }
-          const hasSave = !!localStorage.getItem(SAVE_KEY(0));
-          if (!hasSave) {
-              setView('SLOT_SELECT');
-          } else {
-              loadGame();
-          }
+          setView('SLOT_SELECT');
       }
   }, []);
 
