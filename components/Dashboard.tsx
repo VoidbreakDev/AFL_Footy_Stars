@@ -19,6 +19,7 @@ const Dashboard: React.FC = () => {
   const [showMilestone, setShowMilestone] = useState<Milestone | null>(null);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [showMediaEvent, setShowMediaEvent] = useState<MediaEvent | null>(null);
+  const [guideStep, setGuideStep] = useState<number | null>(null);
 
   useEffect(() => {
     if (lastMatchResult && lastMatchResult.achievedMilestones && lastMatchResult.achievedMilestones.length > 0) {
@@ -362,8 +363,51 @@ const Dashboard: React.FC = () => {
           onClaim={() => {
             claimReward();
             setShowDailyReward(false);
+            // Show first-round guide for brand-new players (seenTips is {})
+            if (player && player.seenTips !== undefined && Object.keys(player.seenTips).length === 0) {
+              setGuideStep(1);
+            }
           }}
         />
+      )}
+
+      {/* First-Round Guide Overlay (shown after daily login for new players) */}
+      {guideStep !== null && (
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-end justify-center p-6">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="text-xs text-slate-500 mb-1 uppercase tracking-widest">Step {guideStep} of 3</div>
+            {guideStep === 1 && (
+              <>
+                <h3 className="font-black text-lg text-white mb-2">Play Your First Match</h3>
+                <p className="text-slate-400 text-sm mb-4">Tap the football button in the centre of the nav bar to go to your dashboard and play your first match. You'll earn XP and your first Skill Point.</p>
+              </>
+            )}
+            {guideStep === 2 && (
+              <>
+                <h3 className="font-black text-lg text-white mb-2">Train After Matches</h3>
+                <p className="text-slate-400 text-sm mb-4">After each match, visit Training (the lightning bolt) to spend Skill Points and improve your attributes.</p>
+              </>
+            )}
+            {guideStep === 3 && (
+              <>
+                <h3 className="font-black text-lg text-white mb-2">Track Your Progress</h3>
+                <p className="text-slate-400 text-sm mb-4">Tap "Me" in the nav bar to see your career stats, season breakdown, and milestones.</p>
+              </>
+            )}
+            <button
+              onClick={() => {
+                if (guideStep < 3) {
+                  setGuideStep(guideStep + 1);
+                } else {
+                  setGuideStep(null);
+                }
+              }}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-xl py-3 font-black uppercase tracking-wider active:scale-95 transition-all"
+            >
+              {guideStep < 3 ? "Got it →" : "Let's Go!"}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Season Recap Modal */}
