@@ -11,6 +11,7 @@ import FinalsIntro from './FinalsIntro';
 import SemiFinalsResults from './SemiFinalsResults';
 import GrandFinalResult from './GrandFinalResult';
 import TeamLogo from './TeamLogo';
+import TipCard from './TipCard';
 import { getDailyRewardForStreak } from '../utils/dailyRewardUtils';
 
 const Dashboard: React.FC = () => {
@@ -88,6 +89,12 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="p-4 space-y-6 pb-24 relative">
+
+      <TipCard
+        tipKey="DASHBOARD"
+        title="Welcome to your career!"
+        body="Tap 'Play Match' each round to earn XP and progress your career. Check your energy and morale before each game."
+      />
 
       {/* Post-Match Press Conference Modal */}
       {showMediaEvent && (

@@ -8,6 +8,8 @@ import Avatar from './Avatar';
 const Onboarding: React.FC = () => {
   const { startNewGame } = useGame();
   const [step, setStep] = useState(1);
+  const [guideStep, setGuideStep] = useState<number | null>(null);
+  const [pendingProfile, setPendingProfile] = useState<any>(null);
   
   const [name, setName] = useState('');
   const [position, setPosition] = useState<Position>(Position.MIDFIELDER);
@@ -71,7 +73,8 @@ const Onboarding: React.FC = () => {
       isRetired: false
     };
     
-    startNewGame(newProfile);
+    setPendingProfile(newProfile);
+    setGuideStep(1);
   };
 
   return (
@@ -231,6 +234,46 @@ const Onboarding: React.FC = () => {
             </div>
         )}
       </div>
+
+      {/* First-Round Guide Overlay */}
+      {guideStep !== null && (
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-end justify-center p-6">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="text-xs text-slate-500 mb-1 uppercase tracking-widest">Step {guideStep} of 3</div>
+            {guideStep === 1 && (
+              <>
+                <h3 className="font-black text-lg text-white mb-2">Play Your First Match</h3>
+                <p className="text-slate-400 text-sm mb-4">Your first match is ready. Tap the Match button on the dashboard to play and earn your first XP.</p>
+              </>
+            )}
+            {guideStep === 2 && (
+              <>
+                <h3 className="font-black text-lg text-white mb-2">Train After Matches</h3>
+                <p className="text-slate-400 text-sm mb-4">After each match, visit Training to spend Skill Points and improve your attributes.</p>
+              </>
+            )}
+            {guideStep === 3 && (
+              <>
+                <h3 className="font-black text-lg text-white mb-2">Track Your Progress</h3>
+                <p className="text-slate-400 text-sm mb-4">Visit Player Stats to see your career progression, season stats, and milestones.</p>
+              </>
+            )}
+            <button
+              onClick={() => {
+                if (guideStep < 3) {
+                  setGuideStep(guideStep + 1);
+                } else {
+                  setGuideStep(null);
+                  startNewGame(pendingProfile);
+                }
+              }}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-xl py-3 font-black uppercase tracking-wider active:scale-95 transition-all"
+            >
+              {guideStep < 3 ? "Got it →" : "Let's Go! →"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

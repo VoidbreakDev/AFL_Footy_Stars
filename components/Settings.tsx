@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 
 const Settings: React.FC = () => {
-  const { saveGame, loadGame, setView, retirePlayer, currentSlot } = useGame();
+  const { saveGame, loadGame, setView, retirePlayer, currentSlot, setPlayer } = useGame();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [musicVol, setMusicVol] = useState(50);
   const [sfxVol, setSfxVol] = useState(80);
@@ -60,6 +60,17 @@ const Settings: React.FC = () => {
                  <span>📂</span> Load Game
               </button>
           </div>
+
+          <button
+            onClick={() => {
+              setPlayer(prev => prev ? { ...prev, seenTips: {} } : null);
+              setFeedback("Tips reset! They'll show again next visit.");
+              setTimeout(() => setFeedback(null), 2000);
+            }}
+            className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl uppercase text-sm active:scale-95 transition-all"
+          >
+            Reset Tutorial Tips
+          </button>
 
           {feedback && (
               <div className="mt-4 p-3 bg-slate-900/50 rounded-lg text-center text-white font-bold animate-pulse border border-slate-600">

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { SHOP_ITEMS } from '../constants';
 import { ShopItem } from '../types';
+import TipCard from './TipCard';
 
 const Shop: React.FC = () => {
     const { player, setView, purchaseItem } = useGame();
@@ -74,6 +75,7 @@ const Shop: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-green-950 via-gray-900 to-black text-white p-6">
+            <TipCard tipKey="SHOP" title="Shop Tips" body="Spend your wallet earnings on recovery items and boosts. Energy recovery items are key for long seasons." />
             {/* Success Message */}
             {purchaseMessage && (
                 <div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-pulse">
