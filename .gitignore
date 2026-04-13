@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+**/.DS_Store
+
+# Environment
+.env
+.env.local
+*.local
+
+# Claude Code internals
+.claude/
+
+# Misc
+node_modules/@esbuild/darwin-arm64/bin/esbuild 2
