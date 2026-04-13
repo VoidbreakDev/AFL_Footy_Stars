@@ -52,7 +52,37 @@ const LeagueView: React.FC = () => {
 
        <div className="p-4">
            {activeTab === 'LADDER' ? (
-               <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-lg animate-fade-in">
+               <div className="space-y-4 animate-fade-in">
+               {/* Active Rivalries */}
+               {player?.rivalries && player.rivalries.filter(r => !r.resolved).length > 0 && (
+                   <div className="bg-white/10 rounded-xl p-4">
+                       <h3 className="text-white font-bold mb-3">⚔️ Active Rivalries</h3>
+                       {player.rivalries.filter(r => !r.resolved).map((r, i) => (
+                           <div key={i} className="flex justify-between items-center py-2.5 border-b border-white/10 last:border-0">
+                               <div>
+                                   <div className="text-white font-semibold text-sm">{r.opponentName}</div>
+                                   <div className="text-white/50 text-xs">{r.club}</div>
+                               </div>
+                               <div className="flex flex-col items-end gap-1">
+                                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${
+                                       r.intensity === 'Heated' ? 'bg-red-600' :
+                                       r.intensity === 'High'   ? 'bg-orange-500' :
+                                       r.intensity === 'Medium' ? 'bg-yellow-500' : 'bg-slate-500'
+                                   }`}>
+                                       {r.intensity}
+                                   </span>
+                                   {r.headToHead && (
+                                       <span className="text-white/50 text-xs">
+                                           {r.headToHead.wins}W – {r.headToHead.losses}L
+                                       </span>
+                                   )}
+                               </div>
+                           </div>
+                       ))}
+                   </div>
+               )}
+               {/* Ladder Table */}
+               <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-lg">
                    <table className="w-full text-sm text-left">
                        <thead className="bg-slate-950 text-slate-400 font-bold uppercase text-[10px]">
                            <tr>
@@ -78,6 +108,7 @@ const LeagueView: React.FC = () => {
                            ))}
                        </tbody>
                    </table>
+               </div>
                </div>
            ) : (
                <div className="animate-fade-in space-y-4">
