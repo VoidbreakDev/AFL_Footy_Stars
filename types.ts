@@ -427,6 +427,9 @@ export interface CareerEventEffect {
   addRivalry?: Rivalry;
   unlockAchievement?: string; // Achievement ID to unlock
 
+  // Rivalry resolution
+  rivalryResolved?: boolean; // Mark the first active rivalry as resolved
+
   // Text feedback
   resultText?: string; // Describe what happened
 }

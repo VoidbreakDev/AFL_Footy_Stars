@@ -13,7 +13,7 @@ import { calculateSeasonAwards } from '../utils/awardUtils';
 import { createDraftClass, shouldHoldDraft, simulateDraftPick, isPlayerDraftEligible, generateDraftClassWithPlayer, wasPlayerDrafted } from '../utils/draftUtils';
 import { processLeagueRosterTurnover } from '../utils/rosterUtils';
 import { initializeMediaReputation, generateMediaEvent, updateMediaReputation, respondToMediaEvent, createSocialMediaPost, calculatePassiveFanGrowth } from '../utils/mediaUtils';
-import { generateCareerEvent, canGenerateNewEvent, resolveCareerEvent, resolveCareerEventChoice } from '../utils/careerEventUtils';
+import { generateCareerEvent, canGenerateNewEvent, resolveCareerEvent, resolveCareerEventChoice, generateFanMailEvent } from '../utils/careerEventUtils';
 import { initializeTeamChemistry, calculateOverallChemistry, updateTeamChemistryAfterMatch, generateTeammateInteraction, updateTeammateRelationship, incrementMatchesTogether, calculateChemistryBonus } from '../utils/chemistryUtils';
 import { initializeCoachingStaff, generateCoachInteraction, updateCoachRelationship, hireStaff, processStaffContracts } from '../utils/coachingUtils';
 
@@ -443,7 +443,34 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // 4. Update Player Stats & Morale
       setPlayer(prev => {
           if(!prev) return null;
-          const updatedRivalries = [...(prev.rivalries || [])];
+
+          // Rivalry: add new rivalry and update head-to-head for existing ones
+          const escalateIntensity = (
+              current: 'Low' | 'Medium' | 'High' | 'Heated',
+              amount: number
+          ): 'Low' | 'Medium' | 'High' | 'Heated' => {
+              const levels: Array<'Low' | 'Medium' | 'High' | 'Heated'> = ['Low', 'Medium', 'High', 'Heated'];
+              return levels[Math.min(levels.length - 1, levels.indexOf(current) + amount)];
+          };
+
+          const opponentClub = opponent?.name;
+          const playerWon = myScore > oppScore;
+          const updatedRivalries = (prev.rivalries || []).map(r => {
+              if (r.club !== opponentClub || r.resolved) return r;
+              const h2h = r.headToHead ?? { wins: 0, losses: 0 };
+              const newEvent = {
+                  round: currentRound ?? 0,
+                  year: prev.currentYear ?? 0,
+                  description: playerWon ? `Beat ${r.club}` : `Lost to ${r.club}`,
+                  intensityChange: playerWon ? 1 : 2,
+              };
+              return {
+                  ...r,
+                  headToHead: playerWon ? { ...h2h, wins: h2h.wins + 1 } : { ...h2h, losses: h2h.losses + 1 },
+                  history: [...(r.history ?? []), newEvent],
+                  intensity: escalateIntensity(r.intensity, playerWon ? 1 : 2),
+              };
+          });
           if (result.newRivalry) {
               updatedRivalries.push(result.newRivalry);
           }
@@ -537,7 +564,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               updatedPlayer,
               result,
               currentRound,
-              updatedPlayer.currentYear || 1
+              updatedPlayer.currentYear || 1,
+              myTeam?.culture
           );
 
           if (mediaEvent) {
@@ -987,6 +1015,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
           }
 
+          // Fan mail event at season start (requires 5000+ followers)
+          if (seasonEnded) {
+              const fanMailEvent = generateFanMailEvent({ ...prev, activeCareerEvents: updatedActiveEvents });
+              if (fanMailEvent) {
+                  updatedActiveEvents = [...updatedActiveEvents, fanMailEvent];
+              }
+          }
+
           // Apply aging effects at season end (speed/stamina decline from 30+)
           const agingResult = seasonEnded ? applyAgingEffects({ ...prev, age: newAge }) : null;
 
@@ -1362,13 +1398,24 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const offer = player.transferOffers?.find(o => o.id === offerId);
       if (!offer) return;
 
-      const updatedPlayer = {
+      const newTeam = league.find(t => t.name === offer.clubName);
+      const baseUpdate = {
           ...acceptTransferOffer(player, offer),
           isCaptain: false,
           captaincyYear: undefined,
           captainSpeechUsed: false,
           lowChemistryStreak: 0,
       };
+      // BIG_CITY culture gives a fan follower bonus on joining
+      const updatedPlayer = newTeam?.culture === 'BIG_CITY' && baseUpdate.mediaReputation
+          ? {
+              ...baseUpdate,
+              mediaReputation: {
+                  ...baseUpdate.mediaReputation,
+                  fanFollowers: (baseUpdate.mediaReputation.fanFollowers ?? 0) + 2000
+              }
+          }
+          : baseUpdate;
       setPlayer(updatedPlayer);
 
       // Update league with new team assignment
@@ -1742,10 +1789,24 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const { updatedPlayer, updatedEvent, history } = resolveCareerEventChoice(player, event, choiceId);
 
+      // Handle rivalry resolved effect
+      const choice = event.choices?.find((c: any) => c.id === choiceId);
+      let finalPlayer = updatedPlayer;
+      if ((choice?.effects as any)?.rivalryResolved) {
+          let marked = false;
+          finalPlayer = {
+              ...finalPlayer,
+              rivalries: (finalPlayer.rivalries ?? []).map(r => {
+                  if (!r.resolved && !marked) { marked = true; return { ...r, resolved: true }; }
+                  return r;
+              })
+          };
+      }
+
       setPlayer(prev => {
           if (!prev) return null;
           return {
-              ...updatedPlayer,
+              ...finalPlayer,
               activeCareerEvents: (prev.activeCareerEvents || []).filter(e => e.id !== eventId),
               careerEventHistory: [...(prev.careerEventHistory || []), history]
           };
