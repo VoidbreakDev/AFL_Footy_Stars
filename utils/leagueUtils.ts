@@ -1,4 +1,4 @@
-import { Team, Fixture, LeagueTier, Position, MatchResult, Stadium, PlayerAttributes, AIPlayer } from '../types';
+import { Team, Fixture, LeagueTier, Position, MatchResult, Stadium, PlayerAttributes, AIPlayer, CultureType } from '../types';
 import { TEAM_NAMES_LOCAL, TEAM_NAMES_STATE, TEAM_NAMES_AFL, FIRST_NAMES, LAST_NAMES, SEASON_LENGTH, STADIUM_TEMPLATES, TEAM_LOGOS } from '../constants';
 
 // Generate attributes for AI player based on overall rating and position
@@ -106,6 +106,16 @@ export const generateLeague = (tier: LeagueTier): Team[] => {
   } else if (tier === LeagueTier.NATIONAL) {
     names = TEAM_NAMES_AFL;
   }
+  const AFL_CULTURES: Record<string, CultureType> = {
+    'Collingwood': 'STORIED_CLUB', 'Richmond': 'STORIED_CLUB', 'Hawthorn': 'STORIED_CLUB',
+    'Geelong': 'PREMIERSHIP_HUNGRY',
+    'Carlton': 'BIG_CITY', 'Essendon': 'BIG_CITY', 'Sydney': 'BIG_CITY',
+    'Brisbane': 'REBUILDING',
+  };
+  const PROCEDURAL_CULTURES: CultureType[] = [
+    'PREMIERSHIP_HUNGRY', 'REBUILDING', 'UNDERDOG', 'STORIED_CLUB', 'BIG_CITY'
+  ];
+
   return names.map((name, i) => {
       // Generate players based on template
       const players = ROSTER_TEMPLATE.map((slot, j) => {
@@ -142,7 +152,7 @@ export const generateLeague = (tier: LeagueTier): Team[] => {
 
       return {
         id: `team-${i}`,
-        name: tier === LeagueTier.NATIONAL ? `${name} FC` : `${name} District`,
+        name: tier === LeagueTier.NATIONAL ? name : `${name} District`,
         wins: 0,
         losses: 0,
         draws: 0,
@@ -161,7 +171,10 @@ export const generateLeague = (tier: LeagueTier): Team[] => {
         ['#ea580c', '#1e293b'], // Orange
         ['#475569', '#ffffff']  // Slate
         ][i % 8] as [string, string],
-        logo: TEAM_LOGOS[name] || name.charAt(0) // Use emoji logo or fallback to first letter
+        logo: TEAM_LOGOS[name] || name.charAt(0), // Use emoji logo or fallback to first letter
+        culture: tier === LeagueTier.NATIONAL
+          ? (AFL_CULTURES[name] ?? 'UNDERDOG')
+          : PROCEDURAL_CULTURES[i % PROCEDURAL_CULTURES.length],
     };
   });
 };

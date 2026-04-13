@@ -1,4 +1,4 @@
-import { PlayerProfile, MatchResult, MediaEvent, MediaReputation, FanMilestone, LeagueTier } from '../types';
+import { PlayerProfile, MatchResult, MediaEvent, MediaReputation, FanMilestone, LeagueTier, CultureType } from '../types';
 
 // Fan milestone thresholds
 const FAN_MILESTONES: Omit<FanMilestone, 'unlocked'>[] = [
@@ -33,12 +33,24 @@ export const initializeMediaReputation = (): MediaReputation => {
     };
 };
 
+// Culture-based media frequency modifier
+export const getCultureMediaModifier = (culture?: CultureType): number => {
+    switch (culture) {
+        case 'STORIED_CLUB': return 1.2;
+        case 'BIG_CITY': return 1.3;
+        case 'REBUILDING': return 0.8;
+        case 'UNDERDOG': return 0.9;
+        default: return 1.0;
+    }
+};
+
 // Generate media event after a match
 export const generateMediaEvent = (
     player: PlayerProfile,
     matchResult: MatchResult,
     currentRound: number,
-    currentYear: number
+    currentYear: number,
+    playerTeamCulture?: CultureType
 ): MediaEvent | null => {
     const { playerStats } = matchResult;
     const won = matchResult.winnerId === matchResult.homeScore.total > matchResult.awayScore.total ? 'home' : 'away';
@@ -51,6 +63,9 @@ export const generateMediaEvent = (
 
     if (outstandingPerformance) eventChance = 0.9; // 90% for great performances
     if (poorPerformance) eventChance = 0.5; // 50% for poor performances
+
+    // Apply club culture modifier (BIG_CITY clubs get more media coverage)
+    eventChance = Math.min(1.0, eventChance * getCultureMediaModifier(playerTeamCulture));
 
     if (Math.random() > eventChance) return null;
 

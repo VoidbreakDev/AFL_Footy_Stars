@@ -1,5 +1,5 @@
 
-import { MatchResult, MatchEvent, Team, PlayerProfile, Rivalry, PlayerInjury, PerformerStats, Position } from '../types';
+import { MatchResult, MatchEvent, Team, PlayerProfile, Rivalry, PlayerInjury, PerformerStats, Position, Tactic, CultureType } from '../types';
 
 export const INJURY_TYPES = [
   { name: "Hamstring Strain", weeks: 2 },
@@ -40,9 +40,65 @@ export const PHRASES = {
         "chopped the arms.", "umpire pays the free kick."
     ],
     GENERIC: [
-        "The crowd is roaring.", "Tension building here.", "Great passage of play.", 
+        "The crowd is roaring.", "Tension building here.", "Great passage of play.",
         "Hard ball get in the middle.", "Clearance from the stoppage.", "Arm wrestle in the midfield."
-    ]
+    ],
+    HIT_OUT: [
+        'wins the tap cleanly!',
+        'dominates the ruck contest',
+        'gets first hands to it in the centre',
+        'tips it to advantage with a powerful jump',
+        'outmuscles the opposition ruckman'
+    ],
+    INTERCEPT: [
+        'reads it brilliantly and intercepts!',
+        'cuts off the kick with perfect positioning',
+        'picks it off at full pace',
+        'anticipates the play and takes the ball',
+        'flies in for the intercept mark'
+    ],
+    ONE_ON_ONE: [
+        'wins the one-on-one contest!',
+        'beats the defender with a quick step',
+        'outmarks his opponent in the air',
+        'uses his body well to take the ball',
+        'wins the physical battle'
+    ],
+    ONE_ON_ONE_DEFENSIVE: [
+        'locks down the opponent',
+        'wins the defensive one-on-one',
+        'forces the turnover with great pressure',
+        'reads the play and denies the mark',
+        'sticks the tackle and wins possession'
+    ],
+};
+
+const CROWD_PHRASES_BY_CULTURE: Partial<Record<CultureType, string[]>> = {
+    STORIED_CLUB: [
+        'The faithful roar their approval!',
+        'A thunderous response from the loyal faithful!',
+        'Tradition demands excellence — and they deliver!'
+    ],
+    UNDERDOG: [
+        'The believers go wild!',
+        'The crowd dares to dream big tonight!',
+        "This is what they've been waiting for!"
+    ],
+    BIG_CITY: [
+        'The big city crowd erupts!',
+        'The city is right behind them!',
+        'A packed house absolutely loving this!'
+    ],
+    PREMIERSHIP_HUNGRY: [
+        'They want blood — and they get it!',
+        'The hungry crowd demands excellence!',
+        'This is what finals footy tastes like!'
+    ],
+    REBUILDING: [
+        'A patient crowd beginning to believe...',
+        'Signs of life from the rebuilding faithful.',
+        'Small moments — but big hope here tonight.'
+    ],
 };
 
 // --- HELPER: Simulate CPU Match ---
@@ -68,14 +124,39 @@ export const simulateCPUMatch = (homeTeam: Team, awayTeam: Team): MatchResult =>
 
 // --- MAIN SIMULATION ENGINE ---
 export const calculateMatchOutcome = (
-    homeTeam: Team, 
-    awayTeam: Team, 
-    player: PlayerProfile, 
-    currentRound: number
+    homeTeam: Team,
+    awayTeam: Team,
+    player: PlayerProfile,
+    currentRound: number,
+    tactic: Tactic = 'BALANCED'
 ): MatchResult => {
       // Identify Player's Team ID for later
       const isHome = player.contract.clubName === homeTeam.name;
       const playerTeamId = isHome ? homeTeam.id : awayTeam.id;
+      const playerTeamCulture = (isHome ? homeTeam : awayTeam).culture as CultureType | undefined;
+
+      // -- TACTIC MODIFIERS --
+      let playerScoringBonus = 0;
+      let opponentScoringPenalty = 0;
+      let extraEnergyCost = 0;
+
+      switch (tactic) {
+          case 'ATTACK':
+              playerScoringBonus = 0.2;
+              extraEnergyCost = 5;
+              break;
+          case 'DEFENSIVE':
+              opponentScoringPenalty = 0.15;
+              playerScoringBonus = -0.10;
+              extraEnergyCost = -3;
+              break;
+          case 'PRESS':
+              opponentScoringPenalty = 0.20;
+              extraEnergyCost = 10;
+              break;
+          default:
+              break;
+      }
 
       // -- 0. MORALE CHECK --
       // High morale (>80) gives slight boost, Low morale (<40) gives slight nerf
@@ -110,8 +191,13 @@ export const calculateMatchOutcome = (
       // Apply Morale Multiplier
       let pDisposals = Math.floor(pDisposalsRaw * moraleMultiplier);
       let pGoals = Math.floor(pGoalsRaw * moraleMultiplier);
-      let pBehinds = Math.floor(pBehindsRaw); // Accuracy not necessarily affected by quantity
+      let pBehinds = Math.floor(pBehindsRaw);
       let pTackles = Math.floor(pTacklesRaw * moraleMultiplier);
+
+      // Apply tactic scoring bonus/penalty to player goals
+      if (playerScoringBonus !== 0) {
+          pGoals = Math.max(0, Math.round(pGoals * (1 + playerScoringBonus)));
+      }
 
       // Reduce stats if injured
       if (injuryQuarter > 0) {
@@ -131,7 +217,11 @@ export const calculateMatchOutcome = (
       };
 
       let timeline: MatchEvent[] = [];
-      
+
+      // In-match energy tracking
+      let inMatchEnergy = Math.max(0, Math.min(100, player.energy));
+      let totalEnergyUsed = 0;
+
       let homeGoals = 0; let homeBehinds = 0;
       let awayGoals = 0; let awayBehinds = 0;
 
@@ -201,14 +291,50 @@ export const calculateMatchOutcome = (
               if (injuryQuarter === q && injuryData) {
                   events.push({
                       quarter: q,
-                      time: `${Math.floor(Math.random() * 5) + 15}:00`, // Late in the quarter
+                      time: `${Math.floor(Math.random() * 5) + 15}:00`,
                       description: `${player.name} has gone down clutching their leg! Looks like a ${injuryData.name}. They are being helped off the ground.`,
                       type: 'INJURY',
                       isPlayerInvolved: true,
                       teamId: playerTeamId
                   });
               }
+
+              // Position-specific event (once per quarter, 40% chance)
+              if (Math.random() < 0.4) {
+                  switch (player.position) {
+                      case Position.FORWARD: {
+                          const roll = (player.attributes.goalSense + player.attributes.marking) / 200;
+                          if (Math.random() < roll) {
+                              events.push({ quarter: q, time: `${Math.floor(Math.random()*minutes)+1}:00`, description: `${player.name} ${PHRASES.ONE_ON_ONE[Math.floor(Math.random()*PHRASES.ONE_ON_ONE.length)]}`, type: 'ONE_ON_ONE', isPlayerInvolved: true, teamId: playerTeamId });
+                          }
+                          break;
+                      }
+                      case Position.DEFENDER: {
+                          const roll = (player.attributes.tackling + player.attributes.marking) / 200;
+                          if (Math.random() < roll) {
+                              events.push({ quarter: q, time: `${Math.floor(Math.random()*minutes)+1}:00`, description: `${player.name} ${PHRASES.INTERCEPT[Math.floor(Math.random()*PHRASES.INTERCEPT.length)]}`, type: 'INTERCEPT', isPlayerInvolved: true, teamId: playerTeamId });
+                          } else {
+                              events.push({ quarter: q, time: `${Math.floor(Math.random()*minutes)+1}:00`, description: `${player.name} ${PHRASES.ONE_ON_ONE_DEFENSIVE[Math.floor(Math.random()*PHRASES.ONE_ON_ONE_DEFENSIVE.length)]}`, type: 'ONE_ON_ONE_DEFENSIVE', isPlayerInvolved: true, teamId: playerTeamId });
+                          }
+                          break;
+                      }
+                      case Position.RUCK: {
+                          const roll = (player.attributes.stamina + player.attributes.marking) / 200;
+                          if (Math.random() < roll) {
+                              events.push({ quarter: q, time: `${Math.floor(Math.random()*minutes)+1}:00`, description: `${player.name} ${PHRASES.HIT_OUT[Math.floor(Math.random()*PHRASES.HIT_OUT.length)]}`, type: 'HIT_OUT', isPlayerInvolved: true, teamId: playerTeamId });
+                          }
+                          break;
+                      }
+                      default:
+                          break; // MIDFIELDER already well covered by POSSESSION events
+                  }
+              }
           }
+
+          // Per-quarter energy cost (applies regardless of active/injured)
+          const quarterCost = Math.max(0, (10 + Math.floor(Math.random() * 11)) + extraEnergyCost);
+          inMatchEnergy = Math.max(0, inMatchEnergy - quarterCost);
+          totalEnergyUsed += quarterCost;
 
           // --- TEAM/FILLER EVENTS ---
           const currentEventCount = events.length;
@@ -228,7 +354,11 @@ export const calculateMatchOutcome = (
               let type: MatchEvent['type'] = 'GENERIC';
               let desc = "";
 
-              if (typeRoll < 0.25) {
+              const isOpponentEvent = actingTeam.id !== playerTeamId;
+              const goalThreshold = isOpponentEvent
+                  ? Math.max(0.05, 0.25 * (1 - opponentScoringPenalty))
+                  : 0.25;
+              if (typeRoll < goalThreshold) {
                   type = 'GOAL';
                   desc = `${actorName} ${PHRASES.GOAL[Math.floor(Math.random()*PHRASES.GOAL.length)]}`;
                   if(isHomeEvent) homeGoals++; else awayGoals++;
@@ -254,7 +384,9 @@ export const calculateMatchOutcome = (
                    desc = `${actorName} ${PHRASES.POSSESSION[Math.floor(Math.random()*PHRASES.POSSESSION.length)]}`;
               } else {
                   type = 'GENERIC';
-                  desc = PHRASES.GENERIC[Math.floor(Math.random()*PHRASES.GENERIC.length)];
+                  const culturePhrases = playerTeamCulture ? CROWD_PHRASES_BY_CULTURE[playerTeamCulture] : undefined;
+                  const genericPool = culturePhrases?.length ? culturePhrases : PHRASES.GENERIC;
+                  desc = genericPool[Math.floor(Math.random() * genericPool.length)];
               }
 
               // Rare spectacular play
@@ -329,8 +461,23 @@ export const calculateMatchOutcome = (
           }
       }
 
+      // Forward position stat multiplier
+      if (player.position === Position.FORWARD && pStats.goals > 0) {
+          pStats.goals = Math.round(pStats.goals * 1.1);
+      }
+
       // -- 4. GENERATE "OFFICIAL" BOX SCORE --
       const topPerformers: PerformerStats[] = [];
+
+      // Fisher-Yates shuffle for unique random selection
+      const shuffle = <T>(arr: T[]): T[] => {
+          const a = [...arr];
+          for (let i = a.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [a[i], a[j]] = [a[j], a[i]];
+          }
+          return a;
+      };
 
       // Determine Goal Budgets (use the scores from event generation)
       let homeGoalBudget = finalHomeGoals;
@@ -353,56 +500,48 @@ export const calculateMatchOutcome = (
       homeGoalBudget = Math.max(0, homeGoalBudget);
       awayGoalBudget = Math.max(0, awayGoalBudget);
 
-      // Helper to distribute goals among simulated players
-      const distributeGoals = (budget: number, count: number) => {
+      // Distribute goals among count players — all budget is assigned (no discard)
+      const distributeGoals = (budget: number, count: number): number[] => {
           const distribution = new Array(count).fill(0);
           for (let i = 0; i < budget; i++) {
-              // 70% chance a goal goes to one of our top 3 players
-              // 30% chance it goes to "rest of team" (effectively discarded/not shown)
-              if (Math.random() < 0.7) {
-                  const idx = Math.floor(Math.random() * count);
-                  distribution[idx]++;
-              }
+              distribution[Math.floor(Math.random() * count)]++;
           }
           return distribution;
       };
 
-      // Add 3 random teammates
-      const teammates = isHome ? homeTeam.players : awayTeam.players;
+      // Add 4 UNIQUE teammates (shuffle then slice avoids duplicates)
+      const allTeammates = isHome ? homeTeam.players : awayTeam.players;
+      const filteredTeammates = allTeammates.filter(p => p.name !== player.name);
+      const pickedTeammates = shuffle(filteredTeammates).slice(0, 4);
       const teamBudget = isHome ? homeGoalBudget : awayGoalBudget;
-      const teamGoalDist = distributeGoals(teamBudget, 3); // Distribute budget
+      const teamGoalDist = distributeGoals(teamBudget, pickedTeammates.length);
 
-      for(let i=0; i<3; i++) {
-          const p = teammates.filter(p => p.name !== player.name)[Math.floor(Math.random() * (teammates.length - 1))];
-          if(p) {
-              topPerformers.push({
-                  name: p.name,
-                  teamId: playerTeamId,
-                  goals: teamGoalDist[i], // Assign drawn goal count
-                  disposals: Math.floor(Math.random() * 20) + 12, // Realistic 12-32 disposals
-                  isUser: false
-              });
-          }
-      }
+      pickedTeammates.forEach((p, i) => {
+          topPerformers.push({
+              name: p.name,
+              teamId: playerTeamId,
+              goals: teamGoalDist[i],
+              disposals: Math.floor(Math.random() * 20) + 12,
+              isUser: false
+          });
+      });
 
-      // Add 3 random opponents
+      // Add 4 UNIQUE opponents
       const oppPlayers = isHome ? awayTeam.players : homeTeam.players;
       const oppTeamId = isHome ? awayTeam.id : homeTeam.id;
+      const pickedOpps = shuffle(oppPlayers).slice(0, 4);
       const oppBudget = isHome ? awayGoalBudget : homeGoalBudget;
-      const oppGoalDist = distributeGoals(oppBudget, 3); // Distribute budget
+      const oppGoalDist = distributeGoals(oppBudget, pickedOpps.length);
 
-      for(let i=0; i<3; i++) {
-          const p = oppPlayers[Math.floor(Math.random() * oppPlayers.length)];
-          if(p) {
-              topPerformers.push({
-                  name: p.name,
-                  teamId: oppTeamId,
-                  goals: oppGoalDist[i], // Assign drawn goal count
-                  disposals: Math.floor(Math.random() * 20) + 12, // Realistic 12-32 disposals
-                  isUser: false
-              });
-          }
-      }
+      pickedOpps.forEach((p, i) => {
+          topPerformers.push({
+              name: p.name,
+              teamId: oppTeamId,
+              goals: oppGoalDist[i],
+              disposals: Math.floor(Math.random() * 20) + 12,
+              isUser: false
+          });
+      });
 
       const hTotal = (finalHomeGoals * 6) + finalHomeBehinds;
       const aTotal = (finalAwayGoals * 6) + finalAwayBehinds;
@@ -416,6 +555,8 @@ export const calculateMatchOutcome = (
           timeline,
           newRivalry,
           playerInjury: injuryData,
-          topPerformers
+          topPerformers,
+          energyUsed: totalEnergyUsed,
+          tactic
       };
 };
