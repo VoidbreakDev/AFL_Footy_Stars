@@ -275,6 +275,32 @@ export const resolveCareerEvent = (
 };
 
 /**
+ * Generate a fan mail event if conditions are met (5000+ followers, no active fan mail)
+ */
+export const generateFanMailEvent = (player: PlayerProfile): CareerEvent | null => {
+  if ((player.mediaReputation?.fanFollowers ?? 0) < 5000) return null;
+  if (player.activeCareerEvents?.some(e => e.type === 'FAN_MAIL')) return null;
+
+  const templates = CAREER_EVENT_TEMPLATES.filter(t => t.type === 'FAN_MAIL');
+  if (!templates.length) return null;
+
+  const template = templates[Math.floor(Math.random() * templates.length)];
+  return {
+    id: `${template.id ?? 'fan_mail'}_${Date.now()}`,
+    type: template.type as CareerEvent['type'],
+    category: template.category as CareerEvent['category'],
+    title: template.title,
+    description: template.description,
+    icon: template.icon,
+    rarity: template.rarity as CareerEvent['rarity'],
+    round: 0,
+    year: 0,
+    choices: template.choices,
+    resolved: false,
+  };
+};
+
+/**
  * Check if player has too many active events (prevent event spam)
  */
 export const canGenerateNewEvent = (player: PlayerProfile): boolean => {

@@ -7,10 +7,10 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-    const { view, setView } = useGame();
+    const { view, setView, currentSlot } = useGame();
 
     // Views where the nav should slide off-screen
-    const hiddenNavViews = ['ONBOARDING', 'MATCH_PREVIEW', 'MATCH_SIM', 'MATCH_RESULT'];
+    const hiddenNavViews = ['ONBOARDING', 'MATCH_PREVIEW', 'MATCH_SIM', 'MATCH_RESULT', 'SLOT_SELECT'];
     const isNavHidden = hiddenNavViews.includes(view);
 
     // Group match views to prevent unmounting/remounting which destroys MatchSim local state
@@ -24,7 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         `flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-300 ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`;
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white max-w-md mx-auto relative shadow-2xl overflow-hidden flex flex-col">
+        <div className="h-screen bg-slate-900 text-white max-w-md mx-auto relative shadow-2xl overflow-hidden flex flex-col">
             {/* Main Content Area */}
             {/* We use a calculated key to prevent remounting during match sequences */}
             <main className="flex-1 overflow-y-auto scroll-smooth w-full">
@@ -34,9 +34,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </main>
 
             {/* Bottom Navigation */}
-            <div 
-                className={`fixed bottom-0 left-0 w-full bg-slate-950 border-t border-slate-800 h-20 z-50 max-w-md mx-auto left-0 right-0 transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${isNavHidden ? 'translate-y-full' : 'translate-y-0'}`}
+            <div
+                className={`relative shrink-0 bg-slate-950 border-t border-slate-800 h-20 z-50 transition-all duration-500 ${isNavHidden ? 'hidden' : ''}`}
             >
+                {/* Slot badge */}
+                <div className="absolute top-1 right-2 text-white/20 text-[9px] font-semibold select-none">
+                    Career {currentSlot + 1}
+                </div>
                 <div className="grid grid-cols-5 h-full relative">
                     
                     <button onClick={() => setView('TRAINING')} className={navClass(view === 'TRAINING')}>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { TransferOffer, LeagueTier } from '../types';
+import TipCard from './TipCard';
 
 const TransferMarket: React.FC = () => {
     const { player, acceptTransfer, rejectTransfer, setView } = useGame();
@@ -113,6 +114,7 @@ const TransferMarket: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-900 text-white p-4 pb-24">
+            <TipCard tipKey="TRANSFER_MARKET" title="Transfer Tips" body="Transfer offers expire after a few rounds — check back regularly and weigh up salary versus club ranking." />
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <button

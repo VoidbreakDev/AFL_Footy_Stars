@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { Position, LeagueTier, PlayerProfile, AvatarConfig } from '../types';
+import { Position, LeagueTier, PlayerProfile, AvatarConfig, LeagueGender } from '../types';
 import { INITIAL_ATTRIBUTE_POINTS, PRESET_AVATARS, STARTING_AGE } from '../constants';
 import Avatar from './Avatar';
 
@@ -13,6 +13,7 @@ const Onboarding: React.FC = () => {
   const [position, setPosition] = useState<Position>(Position.MIDFIELDER);
   const [selectedAvatar, setSelectedAvatar] = useState<AvatarConfig>(PRESET_AVATARS[0]);
   const [jerseyNumber, setJerseyNumber] = useState(7); // Lucky number 7 as default
+  const [leagueGender, setLeagueGender] = useState<LeagueGender>('MENS');
   
   const [attributes, setAttributes] = useState({
     kicking: 10,
@@ -49,6 +50,7 @@ const Onboarding: React.FC = () => {
     const newProfile: PlayerProfile = {
       name,
       gender: 'Male',
+      leagueGender,
       avatar: selectedAvatar,
       position,
       subPosition: 'GENERIC', // Will be overwritten in GameContext
@@ -123,6 +125,23 @@ const Onboarding: React.FC = () => {
                         >
                             {pos}
                         </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* League Path */}
+                <div className="shrink-0">
+                    <label className="block text-[10px] text-slate-400 mb-1 uppercase font-bold">League Path</label>
+                    <div className="grid grid-cols-2 gap-2">
+                        {([['MENS', '🏉 AFL (Men\'s)', 'Classic AFL career'], ['WOMENS', '🏉 AFLW (Women\'s)', "Women's league path"]] as const).map(([val, label, desc]) => (
+                            <button
+                                key={val}
+                                onClick={() => setLeagueGender(val)}
+                                className={`p-3 rounded-lg text-left border-2 transition-colors ${leagueGender === val ? 'bg-emerald-900/40 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}
+                            >
+                                <div className="font-bold text-xs">{label}</div>
+                                <div className="text-[10px] text-slate-500 mt-0.5">{desc}</div>
+                            </button>
                         ))}
                     </div>
                 </div>

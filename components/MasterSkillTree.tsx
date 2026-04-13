@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useGameContext } from '../context/GameContext';
 import { MASTER_SKILLS } from '../constants';
 import { MasterSkill, PlayerAttributes } from '../types';
+import TipCard from './TipCard';
 import {
   getMasterSkillStatus,
   unlockMasterSkill,
@@ -100,6 +101,7 @@ const MasterSkillTree: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white p-4">
+      <TipCard tipKey="MASTER_SKILLS" title="Master Skills" body="Master Skills unlock once your attributes reach the prerequisite level. Legendary skills are game-changers." />
       {/* Header */}
       <div className="max-w-6xl mx-auto mb-6">
         <button

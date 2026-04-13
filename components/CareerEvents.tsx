@@ -40,10 +40,14 @@ const CareerEvents: React.FC = () => {
     if (event.category === 'NEGATIVE') borderColor = 'border-red-500';
     if (event.category === 'CHOICE') borderColor = 'border-yellow-500';
 
+    const isFanMail = event.type === 'FAN_MAIL';
+    const cardBg = isFanMail ? 'bg-amber-900/40' : 'bg-gray-800';
+    const cardBorder = isFanMail ? 'border-amber-500/60' : borderColor;
+
     return (
       <div
         key={event.id}
-        className={`bg-gray-800 border-2 ${borderColor} rounded-xl p-6 hover:bg-gray-750 transition-all`}
+        className={`${cardBg} border-2 ${cardBorder} rounded-xl p-6 hover:brightness-110 transition-all`}
       >
         <div className="flex items-start gap-4">
           <div className="text-5xl">{event.icon}</div>

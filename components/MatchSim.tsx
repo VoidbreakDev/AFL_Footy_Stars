@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useGame } from '../context/GameContext';
 import { generateMatchCommentary } from '../services/geminiService';
-import { MatchResult, MatchEvent, Position, Team } from '../types';
+import { MatchResult, MatchEvent, Position, Team, Tactic } from '../types';
 import Avatar from './Avatar';
 
 const LOADING_MESSAGES = [
@@ -50,6 +50,8 @@ const MatchSim: React.FC = () => {
   const { player, currentRound, fixtures, league, generateMatchSimulation, commitMatchResult, view, setView, advanceRound, lastMatchResult } = useGame();
   const [simStep, setSimStep] = useState(0); // 0=Preview, 1=Q1, 2=Q2, 3=Q3, 4=Q4, 5=Result
   const [resultPage, setResultPage] = useState(1); // 1=Overview, 2=PersonalStats
+  const [activeResultTab, setActiveResultTab] = useState<'stats' | 'highlights'>('stats');
+  const [selectedTactic, setSelectedTactic] = useState<Tactic>('BALANCED');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
@@ -130,7 +132,7 @@ const MatchSim: React.FC = () => {
   const awayTeam = isHome ? opponent : myTeam;
 
   const handleStartMatch = () => {
-    const result = generateMatchSimulation(currentFixtureIndex);
+    const result = generateMatchSimulation(currentFixtureIndex, selectedTactic);
     setCurrentSimData(result);
     setSimStep(1);
     setResultPage(1);
@@ -208,6 +210,10 @@ const MatchSim: React.FC = () => {
           case 'TURNOVER': return '🔄';
           case 'FREE_KICK': return '🎺';
           case 'RIVALRY': return '🤬';
+          case 'ONE_ON_ONE': return '⚡';
+          case 'ONE_ON_ONE_DEFENSIVE': return '🛡️';
+          case 'HIT_OUT': return '✊';
+          case 'INTERCEPT': return '🦅';
           default: return '•';
       }
   };
@@ -223,6 +229,10 @@ const MatchSim: React.FC = () => {
           case 'POSSESSION': return 'bg-slate-800 border-blue-500/30';
           case 'MARK': return 'bg-slate-800 border-purple-500/30';
           case 'TACKLE': return 'bg-slate-800 border-orange-500/30';
+          case 'ONE_ON_ONE': return 'bg-slate-800 border-orange-400/40';
+          case 'ONE_ON_ONE_DEFENSIVE': return 'bg-slate-800 border-blue-400/40';
+          case 'HIT_OUT': return 'bg-slate-800 border-purple-400/40';
+          case 'INTERCEPT': return 'bg-slate-800 border-teal-400/40';
           default: return 'bg-slate-800 border-slate-700';
       }
   };
@@ -342,6 +352,54 @@ const MatchSim: React.FC = () => {
                </div>
            </div>
            <div className="px-4 pt-2 pb-4 space-y-3">
+               {player?.farewell && (
+                   <div className="bg-gradient-to-r from-amber-700 to-amber-500 rounded-xl p-4 text-center shadow-lg">
+                       <div className="text-white font-black text-lg">🎓 Farewell Game</div>
+                       <div className="text-amber-100 text-sm mt-0.5">{player.name}'s Last Match</div>
+                   </div>
+               )}
+               {player && player.energy < 30 && (
+                   <div className="bg-red-900/70 border border-red-500/40 rounded-xl p-3 text-red-200 text-sm flex items-center gap-2">
+                       <span>⚠️</span>
+                       <span>Low energy — expect a tough game this round.</span>
+                   </div>
+               )}
+               <div>
+                   <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wide mb-2">Game Plan</h3>
+                   <div className="grid grid-cols-1 gap-2">
+                       {([
+                           { tactic: 'ATTACK' as Tactic, label: '⚔️ Attack', desc: 'Higher scoring chance — burns more energy' },
+                           { tactic: 'BALANCED' as Tactic, label: '⚖️ Balanced', desc: 'No modifier — the default approach' },
+                           { tactic: 'DEFENSIVE' as Tactic, label: '🛡️ Defensive', desc: 'Fewer goals against — lower scoring chance' },
+                       ]).map(({ tactic, label, desc }) => (
+                           <button
+                               key={tactic}
+                               onClick={() => setSelectedTactic(tactic)}
+                               className={`p-3 rounded-xl border text-left transition ${
+                                   selectedTactic === tactic
+                                       ? 'bg-green-700 border-green-400 text-white'
+                                       : 'bg-white/5 border-white/15 text-white/70 hover:bg-white/10'
+                               }`}
+                           >
+                               <span className="font-semibold text-sm">{label}</span>
+                               <span className="text-xs opacity-70 block mt-0.5">{desc}</span>
+                           </button>
+                       ))}
+                       {player?.coachingStaff?.staffMembers?.some(s => s.personality === 'TACTICIAN') && (
+                           <button
+                               onClick={() => setSelectedTactic('PRESS')}
+                               className={`p-3 rounded-xl border text-left transition ${
+                                   selectedTactic === 'PRESS'
+                                       ? 'bg-purple-700 border-purple-400 text-white'
+                                       : 'bg-white/5 border-white/15 text-white/70 hover:bg-white/10'
+                               }`}
+                           >
+                               <span className="font-semibold text-sm">🔒 Press</span>
+                               <span className="text-xs opacity-70 block mt-0.5">High pressure — high energy drain (Tactician unlock)</span>
+                           </button>
+                       )}
+                   </div>
+               </div>
                <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700">
                    <button onClick={() => setPreviewTeamId(homeTeam.id)} className={`flex-1 py-2 text-xs font-bold uppercase rounded transition-colors ${previewTeamId === homeTeam.id ? 'bg-emerald-500 text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}>{homeTeam.name}</button>
                    <button onClick={() => setPreviewTeamId(awayTeam.id)} className={`flex-1 py-2 text-xs font-bold uppercase rounded transition-colors ${previewTeamId === awayTeam.id ? 'bg-emerald-500 text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}>{awayTeam.name}</button>
@@ -414,15 +472,30 @@ const MatchSim: React.FC = () => {
       const oppScore = isHome ? lastMatchResult.awayScore : lastMatchResult.homeScore;
       const won = myScore.total > oppScore.total;
 
+      // Quarter / worm derived data
+      const homeQ = lastMatchResult.homeScore.quarters;
+      const awayQ = lastMatchResult.awayScore.quarters;
+      const hasQuarterData = homeQ.length === 4 && awayQ.length === 4;
+      const myQCum  = isHome ? homeQ : awayQ;
+      const oppQCum = isHome ? awayQ : homeQ;
+      const wormPoints = hasQuarterData ? [0, ...myQCum.map((v, i) => v - oppQCum[i])] : [];
+      const isDraw = myScore.total === oppScore.total;
+      const wormColor = won ? '#10b981' : isDraw ? '#f59e0b' : '#ef4444';
+      const wormFill  = won ? 'rgba(16,185,129,0.12)' : isDraw ? 'rgba(245,158,11,0.10)' : 'rgba(239,68,68,0.10)';
+      const maxAbs = wormPoints.length ? Math.max(...wormPoints.map(Math.abs), 30) : 30;
+      const yScale = 45 / maxAbs;
+      const wy = (m: number) => 60 - Math.max(-45, Math.min(45, m * yScale));
+      const wx = (i: number) => 30 + i * 60;
+
       const allPerformers = lastMatchResult.topPerformers || [];
       
       const homePerformers = allPerformers.filter(p => p.teamId === homeTeam.id);
       const awayPerformers = allPerformers.filter(p => p.teamId === awayTeam.id);
 
-      const homeGoals = [...homePerformers].sort((a,b) => b.goals - a.goals).slice(0,3).filter(p => p.goals > 0);
+      const homeGoals = [...homePerformers].sort((a,b) => b.goals - a.goals).filter(p => p.goals > 0).slice(0,3);
       const homeDisp = [...homePerformers].sort((a,b) => b.disposals - a.disposals).slice(0,3);
 
-      const awayGoals = [...awayPerformers].sort((a,b) => b.goals - a.goals).slice(0,3).filter(p => p.goals > 0);
+      const awayGoals = [...awayPerformers].sort((a,b) => b.goals - a.goals).filter(p => p.goals > 0).slice(0,3);
       const awayDisp = [...awayPerformers].sort((a,b) => b.disposals - a.disposals).slice(0,3);
 
       return (
@@ -455,6 +528,79 @@ const MatchSim: React.FC = () => {
                       </div>
 
                       <div className="flex-1 overflow-y-auto min-h-0">
+
+                          {/* Score Worm */}
+                          {hasQuarterData && (
+                              <div className="bg-slate-800 rounded-xl border border-slate-700 mb-4 p-4">
+                                  <h3 className="text-emerald-400 font-bold uppercase text-xs mb-3 tracking-widest">Score Worm</h3>
+                                  <svg viewBox="0 0 300 120" className="w-full" preserveAspectRatio="none">
+                                      <line x1="30" y1="60" x2="270" y2="60" stroke="#334155" strokeWidth="1" strokeDasharray="4,3" />
+                                      {[1,2,3].map(i => (
+                                          <line key={i} x1={wx(i)} y1="18" x2={wx(i)} y2="102" stroke="#1e293b" strokeWidth="1" />
+                                      ))}
+                                      <polygon
+                                          points={[...wormPoints.map((m,i) => `${wx(i)},${wy(m)}`), `${wx(4)},60`, `${wx(0)},60`].join(' ')}
+                                          fill={wormFill}
+                                      />
+                                      <polyline
+                                          points={wormPoints.map((m,i) => `${wx(i)},${wy(m)}`).join(' ')}
+                                          fill="none" stroke={wormColor} strokeWidth="2.5"
+                                          strokeLinejoin="round" strokeLinecap="round"
+                                      />
+                                      {wormPoints.map((m,i) => (
+                                          <circle key={i} cx={wx(i)} cy={wy(m)} r="4"
+                                              fill={wormColor} stroke="#1e293b" strokeWidth="2" />
+                                      ))}
+                                      {(['S','Q1','Q2','Q3','Q4'] as const).map((label,i) => (
+                                          <text key={i} x={wx(i)} y="115" textAnchor="middle" fontSize="9" fill="#64748b" fontWeight="bold">{label}</text>
+                                      ))}
+                                      <text x="8" y="22" fontSize="8" fill="#64748b" dominantBaseline="middle">{myTeam.name.charAt(0)}</text>
+                                      <text x="8" y="98" fontSize="8" fill="#64748b" dominantBaseline="middle">{opponent.name.charAt(0)}</text>
+                                      {(() => {
+                                          const fm = wormPoints[4];
+                                          const labelY = fm >= 0 ? wy(fm) - 10 : wy(fm) + 16;
+                                          return <text x={wx(4)} y={labelY} textAnchor="middle" fontSize="9" fill={wormColor} fontWeight="bold">
+                                              {fm > 0 ? `+${fm}` : fm === 0 ? 'DRAW' : `${fm}`}
+                                          </text>;
+                                      })()}
+                                  </svg>
+                              </div>
+                          )}
+
+                          {/* Quarter Breakdown */}
+                          {hasQuarterData && (
+                              <div className="bg-slate-800 rounded-xl border border-slate-700 mb-4 overflow-hidden">
+                                  <h3 className="text-emerald-400 font-bold uppercase text-xs px-4 pt-3 pb-2 border-b border-slate-700 tracking-widest">Quarter Breakdown</h3>
+                                  <div className="grid grid-cols-7 text-[10px] font-bold uppercase text-slate-500 px-3 py-2 border-b border-slate-700/50">
+                                      <div className="col-span-2">Team</div>
+                                      <div className="text-center">Q1</div>
+                                      <div className="text-center">Q2</div>
+                                      <div className="text-center">Q3</div>
+                                      <div className="text-center">Q4</div>
+                                      <div className="text-center">Total</div>
+                                  </div>
+                                  {[
+                                      { team: homeTeam, qArr: homeQ, score: lastMatchResult.homeScore },
+                                      { team: awayTeam, qArr: awayQ, score: lastMatchResult.awayScore },
+                                  ].map(({ team, qArr, score }) => (
+                                      <div key={team.id}
+                                          className={`grid grid-cols-7 items-center px-3 py-3 border-b border-slate-700/30 last:border-0 ${team.id === myTeam.id ? 'bg-emerald-900/10' : ''}`}
+                                      >
+                                          <div className="col-span-2 text-[11px] font-bold text-white truncate">{team.name.split(' ')[0]}</div>
+                                          {[0,1,2,3].map(i => (
+                                              <div key={i} className="text-center font-mono text-sm text-slate-300">
+                                                  {qArr[i] - (i > 0 ? qArr[i-1] : 0)}
+                                              </div>
+                                          ))}
+                                          <div className="text-center">
+                                              <span className="font-mono text-sm font-bold text-white">{score.goals}.{score.behinds}</span>
+                                              <span className="font-mono text-[10px] text-slate-400 block">({score.total})</span>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                          )}
+
                           <div className="grid grid-cols-2 gap-4 mb-4">
                               <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700">
                                   <div className="text-xs font-bold text-slate-400 uppercase mb-2 text-center">{homeTeam.name} Best</div>
@@ -513,11 +659,55 @@ const MatchSim: React.FC = () => {
 
               {resultPage === 2 && (
                   <div className="animate-fade-in flex flex-col h-full">
-                      <div className="text-center mb-6">
+                      <div className="text-center mb-4">
                           <h2 className="text-2xl font-black text-white uppercase italic">Performance</h2>
                           <p className="text-slate-400 text-sm">Your impact on the game</p>
                       </div>
 
+                      {/* Tab Toggle */}
+                      <div className="flex bg-slate-800 rounded-xl p-1 mb-4 border border-slate-700">
+                          <button
+                              onClick={() => setActiveResultTab('stats')}
+                              className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${activeResultTab === 'stats' ? 'bg-emerald-500 text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
+                          >
+                              Stats
+                          </button>
+                          <button
+                              onClick={() => setActiveResultTab('highlights')}
+                              className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${activeResultTab === 'highlights' ? 'bg-emerald-500 text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
+                          >
+                              Highlights
+                          </button>
+                      </div>
+
+                      {activeResultTab === 'highlights' ? (
+                          <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+                              {(lastMatchResult.highlights && lastMatchResult.highlights.length > 0) ? lastMatchResult.highlights.map((h, i) => {
+                                  const icons: Record<string, string> = {
+                                      GOAL: '⚽', MARK: '🙌', TACKLE: '💪', DISPOSAL: '🏉', INJURY: '🤕',
+                                      RIVALRY: '🤬', ONE_ON_ONE: '⚡', ONE_ON_ONE_DEFENSIVE: '🛡️',
+                                      HIT_OUT: '✊', INTERCEPT: '🦅',
+                                  };
+                                  const icon = icons[h.type] ?? '🏆';
+                                  return (
+                                      <div key={i} className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex items-start gap-3">
+                                          <div className="text-2xl flex-shrink-0">{icon}</div>
+                                          <div className="flex-1 min-w-0">
+                                              <div className="text-emerald-400 font-bold text-xs uppercase tracking-wider mb-1">{h.type.replace(/_/g, ' ')}</div>
+                                              <div className="text-white text-sm leading-snug">{h.description}</div>
+                                              {h.quarter && <div className="text-slate-500 text-xs mt-1">Q{h.quarter}</div>}
+                                          </div>
+                                      </div>
+                                  );
+                              }) : (
+                                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                                      <div className="text-4xl mb-3">🏉</div>
+                                      <div className="text-sm font-bold uppercase">No highlights this game</div>
+                                  </div>
+                              )}
+                          </div>
+                      ) : (
+                      <>
                       <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 mb-6 shadow-xl">
                           <div className="flex items-center justify-center mb-6">
                                <div className="w-20 h-20 rounded-full border-4 border-emerald-500 overflow-hidden shadow-lg">
@@ -603,7 +793,26 @@ const MatchSim: React.FC = () => {
                           ))}
                       </div>
 
-                      <button 
+                      </>
+                      )}
+
+                      {lastMatchResult?.tactic && lastMatchResult.tactic !== 'BALANCED' && (
+                          <div className="text-white/40 text-xs text-center mt-2">
+                              Game plan: {lastMatchResult.tactic.charAt(0) + lastMatchResult.tactic.slice(1).toLowerCase()}
+                          </div>
+                      )}
+
+                      {player?.farewell && (
+                          <div className="bg-gradient-to-br from-amber-700 to-amber-900 rounded-2xl p-6 text-center mt-4 shadow-xl">
+                              <div className="text-5xl mb-3">🎓</div>
+                              <h2 className="text-white font-black text-2xl">Final Whistle</h2>
+                              <p className="text-amber-200 mt-2 text-sm">
+                                  {player.careerStats?.matches ?? 0} career matches · {player.careerStats?.goals ?? 0} goals
+                              </p>
+                          </div>
+                      )}
+
+                      <button
                         onClick={advanceRound}
                         className="w-full py-4 bg-emerald-500 text-slate-900 font-black text-xl rounded-xl uppercase tracking-widest shadow-lg shadow-emerald-900/50 mt-4 hover:bg-emerald-400 active:scale-95 transition-all"
                       >

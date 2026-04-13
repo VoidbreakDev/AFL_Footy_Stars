@@ -5,7 +5,7 @@ import { SEASON_LENGTH } from '../constants';
 import TeamLogo from './TeamLogo';
 
 const LeagueView: React.FC = () => {
-  const { league, player, fixtures, currentRound } = useGame();
+  const { league, player, fixtures, currentRound, setView } = useGame();
   const [activeTab, setActiveTab] = useState<'LADDER' | 'FIXTURE'>('LADDER');
   const [viewRound, setViewRound] = useState(currentRound);
 
@@ -33,7 +33,12 @@ const LeagueView: React.FC = () => {
     <div className="pb-24 bg-slate-900 min-h-screen">
        {/* HEADER */}
        <div className="p-4 bg-slate-800 border-b border-slate-700 shadow-md">
-           <h2 className="text-3xl font-black text-white italic uppercase mb-4">League Central</h2>
+           <div className="flex items-center gap-3 mb-4">
+               <h2 className="text-3xl font-black text-white italic uppercase">League Central</h2>
+               {player?.leagueGender === 'WOMENS' && (
+                   <span className="bg-pink-600 text-white text-xs font-bold px-2 py-0.5 rounded-full uppercase">AFLW</span>
+               )}
+           </div>
            <div className="flex gap-2 p-1 bg-slate-900 rounded-lg">
                 <button 
                     onClick={() => setActiveTab('LADDER')}
@@ -52,7 +57,37 @@ const LeagueView: React.FC = () => {
 
        <div className="p-4">
            {activeTab === 'LADDER' ? (
-               <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-lg animate-fade-in">
+               <div className="space-y-4 animate-fade-in">
+               {/* Active Rivalries */}
+               {player?.rivalries && player.rivalries.filter(r => !r.resolved).length > 0 && (
+                   <div className="bg-white/10 rounded-xl p-4">
+                       <h3 className="text-white font-bold mb-3">⚔️ Active Rivalries</h3>
+                       {player.rivalries.filter(r => !r.resolved).map((r, i) => (
+                           <div key={i} className="flex justify-between items-center py-2.5 border-b border-white/10 last:border-0">
+                               <div>
+                                   <div className="text-white font-semibold text-sm">{r.opponentName}</div>
+                                   <div className="text-white/50 text-xs">{r.club}</div>
+                               </div>
+                               <div className="flex flex-col items-end gap-1">
+                                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${
+                                       r.intensity === 'Heated' ? 'bg-red-600' :
+                                       r.intensity === 'High'   ? 'bg-orange-500' :
+                                       r.intensity === 'Medium' ? 'bg-yellow-500' : 'bg-slate-500'
+                                   }`}>
+                                       {r.intensity}
+                                   </span>
+                                   {r.headToHead && (
+                                       <span className="text-white/50 text-xs">
+                                           {r.headToHead.wins}W – {r.headToHead.losses}L
+                                       </span>
+                                   )}
+                               </div>
+                           </div>
+                       ))}
+                   </div>
+               )}
+               {/* Ladder Table */}
+               <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-lg">
                    <table className="w-full text-sm text-left">
                        <thead className="bg-slate-950 text-slate-400 font-bold uppercase text-[10px]">
                            <tr>
@@ -78,6 +113,7 @@ const LeagueView: React.FC = () => {
                            ))}
                        </tbody>
                    </table>
+               </div>
                </div>
            ) : (
                <div className="animate-fade-in space-y-4">

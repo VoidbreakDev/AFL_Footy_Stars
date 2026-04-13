@@ -1,5 +1,5 @@
-import { Team, Fixture, LeagueTier, Position, MatchResult, Stadium, PlayerAttributes, AIPlayer } from '../types';
-import { TEAM_NAMES_LOCAL, TEAM_NAMES_STATE, TEAM_NAMES_AFL, FIRST_NAMES, LAST_NAMES, SEASON_LENGTH, STADIUM_TEMPLATES, TEAM_LOGOS } from '../constants';
+import { Team, Fixture, LeagueTier, Position, MatchResult, Stadium, PlayerAttributes, AIPlayer, CultureType, ClubHistory, LeagueGender } from '../types';
+import { TEAM_NAMES_LOCAL, TEAM_NAMES_STATE, TEAM_NAMES_AFL, TEAM_NAMES_LOCAL_W, TEAM_NAMES_STATE_W, TEAM_NAMES_AFLW, FIRST_NAMES, LAST_NAMES, SEASON_LENGTH, STADIUM_TEMPLATES, TEAM_LOGOS } from '../constants';
 
 // Generate attributes for AI player based on overall rating and position
 export const generateAIPlayerAttributes = (rating: number, position: Position): PlayerAttributes => {
@@ -71,6 +71,40 @@ export const ROSTER_TEMPLATE = [
     { pos: Position.RUCK, sub: 'INT' },
 ];
 
+// Deterministic hash for consistent procedural generation
+const nameHash = (name: string): number => {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    return h;
+};
+
+// Generate a deterministic club history based on team name
+export const generateClubHistory = (teamName: string, tier: LeagueTier): ClubHistory => {
+    const h = nameHash(teamName);
+    const baseyear = tier === LeagueTier.NATIONAL ? 1897 : tier === LeagueTier.STATE ? 1950 : 1980;
+    const foundingYear = baseyear + (h % 30);
+
+    const premCount = tier === LeagueTier.NATIONAL ? (h % 15) : tier === LeagueTier.STATE ? (h % 8) : (h % 5);
+    const premierships: number[] = [];
+    for (let i = 0; i < premCount; i++) {
+        const yr = foundingYear + 5 + (((h >> i) % 60) + i * 3);
+        if (!premierships.includes(yr)) premierships.push(yr);
+    }
+    premierships.sort((a, b) => a - b);
+
+    const firstNames = ['Jack', 'Tom', 'James', 'Sam', 'Ben', 'Luke', 'Matt', 'Chris'];
+    const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Wilson', 'Taylor', 'Davis'];
+    const rName = (seed: number) => `${firstNames[seed % firstNames.length]} ${lastNames[(seed >> 3) % lastNames.length]}`;
+
+    return {
+        foundingYear,
+        premierships,
+        allTimeGoals: { playerName: rName(h), value: 200 + (h % 600), year: foundingYear + 10 + (h % 50) },
+        allTimeCaps: { playerName: rName(h >> 8), value: 150 + (h % 200), year: foundingYear + 15 + ((h >> 4) % 40) },
+        allTimeDisposals: { playerName: rName(h >> 16), value: 5000 + (h % 10000), year: foundingYear + 20 + ((h >> 8) % 35) },
+    };
+};
+
 // Helper to generate random name
 export const getRandomName = () => {
     const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
@@ -98,14 +132,24 @@ const generateStadium = (teamName: string, tier: LeagueTier): Stadium => {
 };
 
 // Helper to generate random teams with balanced rosters
-export const generateLeague = (tier: LeagueTier): Team[] => {
-  // Select team names based on tier
-  let names = TEAM_NAMES_LOCAL;
+export const generateLeague = (tier: LeagueTier, gender: LeagueGender = 'MENS'): Team[] => {
+  // Select team names based on tier and gender
+  let names = gender === 'WOMENS' ? TEAM_NAMES_LOCAL_W : TEAM_NAMES_LOCAL;
   if (tier === LeagueTier.STATE) {
-    names = TEAM_NAMES_STATE;
+    names = gender === 'WOMENS' ? TEAM_NAMES_STATE_W : TEAM_NAMES_STATE;
   } else if (tier === LeagueTier.NATIONAL) {
-    names = TEAM_NAMES_AFL;
+    names = gender === 'WOMENS' ? TEAM_NAMES_AFLW : TEAM_NAMES_AFL;
   }
+  const AFL_CULTURES: Record<string, CultureType> = {
+    'Collingwood': 'STORIED_CLUB', 'Richmond': 'STORIED_CLUB', 'Hawthorn': 'STORIED_CLUB',
+    'Geelong': 'PREMIERSHIP_HUNGRY',
+    'Carlton': 'BIG_CITY', 'Essendon': 'BIG_CITY', 'Sydney': 'BIG_CITY',
+    'Brisbane': 'REBUILDING',
+  };
+  const PROCEDURAL_CULTURES: CultureType[] = [
+    'PREMIERSHIP_HUNGRY', 'REBUILDING', 'UNDERDOG', 'STORIED_CLUB', 'BIG_CITY'
+  ];
+
   return names.map((name, i) => {
       // Generate players based on template
       const players = ROSTER_TEMPLATE.map((slot, j) => {
@@ -142,7 +186,7 @@ export const generateLeague = (tier: LeagueTier): Team[] => {
 
       return {
         id: `team-${i}`,
-        name: tier === LeagueTier.NATIONAL ? `${name} FC` : `${name} District`,
+        name: tier === LeagueTier.NATIONAL ? name : `${name} District`,
         wins: 0,
         losses: 0,
         draws: 0,
@@ -161,7 +205,11 @@ export const generateLeague = (tier: LeagueTier): Team[] => {
         ['#ea580c', '#1e293b'], // Orange
         ['#475569', '#ffffff']  // Slate
         ][i % 8] as [string, string],
-        logo: TEAM_LOGOS[name] || name.charAt(0) // Use emoji logo or fallback to first letter
+        logo: TEAM_LOGOS[name] || name.charAt(0), // Use emoji logo or fallback to first letter
+        history: generateClubHistory(name, tier),
+        culture: tier === LeagueTier.NATIONAL
+          ? (AFL_CULTURES[name] ?? 'UNDERDOG')
+          : PROCEDURAL_CULTURES[i % PROCEDURAL_CULTURES.length],
     };
   });
 };

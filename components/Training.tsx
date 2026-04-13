@@ -1,11 +1,169 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { PlayerAttributes } from '../types';
+
+// ===== DRILL MINI-GAME COMPONENTS =====
+
+const KickDrill: React.FC<{ onComplete: (hits: number) => void }> = ({ onComplete }) => {
+  const [hits, setHits] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(5);
+  const [started, setStarted] = useState(false);
+  const [tapped, setTapped] = useState(Array(5).fill(false));
+
+  useEffect(() => {
+    if (!started || timeLeft <= 0) return;
+    const id = setInterval(() => setTimeLeft(t => {
+      if (t <= 1) { clearInterval(id); onComplete(hits); return 0; }
+      return t - 1;
+    }), 1000);
+    return () => clearInterval(id);
+  }, [started, timeLeft, hits, onComplete]);
+
+  if (!started) {
+    return (
+      <button onClick={() => setStarted(true)} className="w-full bg-green-600 hover:bg-green-500 text-white rounded-xl py-3 font-bold">
+        Start — Tap all targets!
+      </button>
+    );
+  }
+
+  return (
+    <div>
+      <p className="text-white/70 text-sm mb-3">Time: {timeLeft}s · Hits: {hits} / 5</p>
+      <div className="grid grid-cols-3 gap-3">
+        {tapped.map((hit, i) => (
+          <button
+            key={i}
+            disabled={hit || timeLeft <= 0}
+            onClick={() => {
+              setTapped(prev => prev.map((v, j) => j === i ? true : v));
+              setHits(h => h + 1);
+            }}
+            className={`h-16 rounded-xl font-bold text-2xl transition ${
+              hit ? 'bg-gray-600 text-white/30' : 'bg-red-500 hover:bg-red-400 text-white active:scale-95'
+            }`}
+          >
+            {hit ? '✓' : '🎯'}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const ReactionDrill: React.FC<{ onComplete: (ms: number) => void }> = ({ onComplete }) => {
+  const [phase, setPhase] = useState<'waiting' | 'ready' | 'done'>('waiting');
+  const [startTime, setStartTime] = useState(0);
+  const [pos, setPos] = useState({ x: 50, y: 50 });
+
+  useEffect(() => {
+    if (phase !== 'waiting') return;
+    const delay = 1000 + Math.random() * 2000;
+    const id = setTimeout(() => {
+      setPos({ x: 15 + Math.random() * 70, y: 15 + Math.random() * 70 });
+      setStartTime(Date.now());
+      setPhase('ready');
+    }, delay);
+    return () => clearTimeout(id);
+  }, [phase]);
+
+  if (phase === 'done') return <p className="text-white/50 text-sm text-center py-4">Calculating...</p>;
+
+  return (
+    <div
+      className="relative h-48 bg-white/5 rounded-xl overflow-hidden cursor-pointer select-none"
+      onClick={() => {
+        if (phase === 'ready') {
+          const ms = Date.now() - startTime;
+          setPhase('done');
+          onComplete(ms);
+        }
+      }}
+    >
+      {phase === 'waiting' && (
+        <p className="absolute inset-0 flex items-center justify-center text-white/40 text-sm">
+          Wait for the target...
+        </p>
+      )}
+      {phase === 'ready' && (
+        <button
+          className="absolute w-16 h-16 bg-green-400 rounded-full flex items-center justify-center text-white font-black text-sm shadow-lg animate-bounce"
+          style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }}
+        >
+          TAP!
+        </button>
+      )}
+    </div>
+  );
+};
+
+const StrengthDrill: React.FC<{ onComplete: (clicks: number) => void }> = ({ onComplete }) => {
+  const [clicks, setClicks] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(5);
+  const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    if (!started || timeLeft <= 0) return;
+    const id = setInterval(() => setTimeLeft(t => {
+      if (t <= 1) { clearInterval(id); onComplete(clicks); return 0; }
+      return t - 1;
+    }), 1000);
+    return () => clearInterval(id);
+  }, [started, timeLeft, clicks, onComplete]);
+
+  if (!started) {
+    return (
+      <button onClick={() => setStarted(true)} className="w-full bg-orange-600 hover:bg-orange-500 text-white rounded-xl py-3 font-bold">
+        Start — Tap as fast as you can!
+      </button>
+    );
+  }
+
+  return (
+    <div className="text-center">
+      <p className="text-white/70 text-sm mb-4">Time: {timeLeft}s · Reps: {clicks}</p>
+      <button
+        onClick={() => { if (timeLeft > 0) setClicks(c => c + 1); }}
+        disabled={timeLeft <= 0}
+        className="w-32 h-32 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 rounded-full text-white font-black text-xl active:scale-95 transition-transform select-none"
+      >
+        TAP!
+      </button>
+    </div>
+  );
+};
 import { getAvailableMasterSkills } from '../utils/masterSkillUtils';
+import TipCard from './TipCard';
 
 const Training: React.FC = () => {
-  const { player, trainAttribute, setView } = useGame();
+  const { player, trainAttribute, setView, setRehabChoice, currentRound, setPlayer } = useGame();
+  const [chosenRehab, setChosenRehab] = useState<'REST' | 'LIGHT' | 'PUSH' | null>(null);
+  const [activeDrill, setActiveDrill] = useState<'KICK' | 'REACTION' | 'STRENGTH' | null>(null);
+  const [drillDone, setDrillDone] = useState(false);
+  const [drillResult, setDrillResult] = useState<string | null>(null);
+
+  const drillType = (['KICK', 'REACTION', 'STRENGTH'] as const)[currentRound % 3];
+
+  const completeDrill = (raw: number) => {
+    let spBonus = 0;
+    let resultMsg = '';
+    if (drillType === 'KICK') {
+      spBonus = raw >= 4 ? 2 : raw >= 2 ? 1 : 0;
+      resultMsg = raw >= 4 ? `Perfect! ${raw}/5 hits — +2 SP bonus!` : raw >= 2 ? `Good work! ${raw}/5 hits — +1 SP bonus.` : `Keep practising. ${raw}/5 hits.`;
+    } else if (drillType === 'REACTION') {
+      spBonus = raw < 300 ? 2 : raw < 600 ? 1 : 0;
+      resultMsg = raw < 300 ? `Lightning fast! ${raw}ms — +2 SP bonus!` : raw < 600 ? `Good reflexes! ${raw}ms — +1 SP bonus.` : `Slow reaction. ${raw}ms — no bonus.`;
+    } else {
+      spBonus = raw >= 20 ? 2 : raw >= 10 ? 1 : 0;
+      resultMsg = raw >= 20 ? `Beast mode! ${raw} reps — +2 SP bonus!` : raw >= 10 ? `Solid effort! ${raw} reps — +1 SP bonus.` : `Keep grinding. ${raw} reps.`;
+    }
+    setDrillResult(resultMsg);
+    setDrillDone(true);
+    if (spBonus > 0) {
+      setPlayer((prev: any) => prev ? { ...prev, skillPoints: prev.skillPoints + spBonus } : prev);
+    }
+  };
 
   if (!player) return null;
 
@@ -22,7 +180,54 @@ const Training: React.FC = () => {
 
   return (
     <div className="p-4 pb-24 min-h-screen bg-slate-900">
-      
+
+      <TipCard tipKey="TRAINING" title="Training Tips" body="Spend Skill Points to improve your attributes. Each attribute has a cap set by your potential rating." />
+
+      {/* Injury Rehab Panel — shown instead of training when injured */}
+      {player.injury && (() => {
+          const hasPhysio = player.coachingStaff?.staffMembers?.some(s => s.role === 'PHYSIO') ?? false;
+          const REHAB_OPTIONS = [
+              { choice: 'REST' as const, label: '😴 Rest', desc: 'Normal –1 week recovery. No risk. +3 morale.' },
+              { choice: 'LIGHT' as const, label: '🏃 Train Light', desc: `${hasPhysio ? '60%' : '50%'} chance: heal 1 extra week. 10% re-injury risk.` },
+              { choice: 'PUSH' as const, label: '💪 Push Through', desc: `30% chance: heal 2 extra weeks. ${hasPhysio ? '15%' : '25%'} re-injury risk.` },
+          ];
+          const confirmRehab = (choice: 'REST' | 'LIGHT' | 'PUSH' | null) => {
+              if (!choice) return;
+              setRehabChoice(choice);
+          };
+          return (
+              <div className="bg-red-900/40 rounded-2xl p-5 mb-6">
+                  <h3 className="text-red-200 font-bold text-lg mb-1">🤕 {player.injury!.name}</h3>
+                  <p className="text-red-300/70 text-sm mb-1">{player.injury!.weeksRemaining} week(s) remaining</p>
+                  {hasPhysio && <p className="text-green-300 text-xs mb-4">✓ Physio staff — improved recovery odds active</p>}
+                  <div className="flex flex-col gap-2 mb-4">
+                      {REHAB_OPTIONS.map(({ choice, label, desc }) => (
+                          <button
+                              key={choice}
+                              onClick={() => setChosenRehab(choice)}
+                              className={`p-4 rounded-xl border text-left transition ${
+                                  chosenRehab === choice ? 'bg-white/20 border-white/40' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                              }`}
+                          >
+                              <div className="text-white font-semibold text-sm">{label}</div>
+                              <div className="text-white/60 text-xs mt-0.5">{desc}</div>
+                          </button>
+                      ))}
+                  </div>
+                  <button
+                      onClick={() => confirmRehab(chosenRehab)}
+                      disabled={!chosenRehab}
+                      className="w-full bg-green-600 disabled:opacity-40 text-white rounded-xl py-3 font-bold"
+                  >
+                      Confirm Rehab Plan
+                  </button>
+                  {player.injury?.rehabChoice && (
+                      <p className="text-green-400 text-xs text-center mt-2">✓ {player.injury.rehabChoice} selected for this round</p>
+                  )}
+              </div>
+          );
+      })()}
+
       {/* Header with Energy Bar */}
       <div className="mb-6 sticky top-0 bg-slate-900/95 backdrop-blur z-10 py-2 border-b border-slate-800">
           <div className="flex items-center justify-between mb-4">
@@ -83,6 +288,35 @@ const Training: React.FC = () => {
           <div className="text-4xl font-black text-emerald-400">{player.potential} <span className="text-sm text-slate-600 font-normal">/ 99</span></div>
       </div>
 
+      {/* Drill of the Day */}
+      <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 mb-6">
+          <div className="flex items-center justify-between mb-3">
+              <div>
+                  <p className="text-slate-400 text-xs uppercase font-bold">Drill of the Day</p>
+                  <p className="text-white font-bold text-sm">
+                      {drillType === 'KICK' ? '🎯 Target Practice' : drillType === 'REACTION' ? '⚡ Reaction Test' : '💪 Strength Circuit'}
+                  </p>
+              </div>
+              {!drillDone && !activeDrill && (
+                  <button
+                      onClick={() => setActiveDrill(drillType)}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg"
+                  >
+                      Start Drill
+                  </button>
+              )}
+          </div>
+          {activeDrill === 'KICK' && !drillDone && <KickDrill onComplete={completeDrill} />}
+          {activeDrill === 'REACTION' && !drillDone && <ReactionDrill onComplete={completeDrill} />}
+          {activeDrill === 'STRENGTH' && !drillDone && <StrengthDrill onComplete={completeDrill} />}
+          {drillDone && drillResult && (
+              <p className="text-emerald-400 font-bold text-sm text-center py-2">{drillResult}</p>
+          )}
+          {!activeDrill && !drillDone && (
+              <p className="text-slate-500 text-xs">Complete today's drill for bonus Skill Points.</p>
+          )}
+      </div>
+
       {/* Attribute Cards */}
       <div className="grid gap-3">
           {attributes.map(attr => {
@@ -95,7 +329,12 @@ const Training: React.FC = () => {
                   <div key={attr} className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm relative overflow-hidden group">
                       
                       <div className="flex justify-between items-center mb-2 relative z-10">
-                          <div className="capitalize font-bold text-slate-200 text-lg">{attr.replace(/([A-Z])/g, ' $1').trim()}</div>
+                          <div className="capitalize font-bold text-slate-200 text-lg flex items-center gap-1">
+                              {attr.replace(/([A-Z])/g, ' $1').trim()}
+                              {player.age >= 30 && (attr === 'speed' || attr === 'stamina') && (
+                                  <span className="text-amber-400 text-xs" title="Declining with age — consider Recovery items.">📉</span>
+                              )}
+                          </div>
                           
                           {/* Value Display with Projection */}
                           <div className="flex items-center gap-2 bg-slate-950/50 px-3 py-1 rounded-lg">

@@ -26,6 +26,9 @@ export interface Rivalry {
   club: string;
   reason: string;
   intensity: 'Low' | 'Medium' | 'High' | 'Heated';
+  history?: RivalryEvent[];
+  headToHead?: { wins: number; losses: number };
+  resolved?: boolean;
 }
 
 export interface PlayerStats {
@@ -62,7 +65,10 @@ export interface AvatarConfig {
 export interface PlayerInjury {
   name: string;
   weeksRemaining: number;
+  rehabChoice?: 'REST' | 'LIGHT' | 'PUSH';
 }
+
+export type Tactic = 'ATTACK' | 'BALANCED' | 'DEFENSIVE' | 'PRESS';
 
 export interface UnlockedAchievement {
   achievementId: string;
@@ -209,6 +215,20 @@ export interface PlayerProfile {
 
   // Master Skill Tree
   masterSkills?: UnlockedMasterSkill[]; // Unlocked master skills
+
+  // UX / Onboarding
+  seenTips?: Record<string, boolean>;
+
+  // Progression
+  legacyScore?: number;
+  postCareerPath?: 'MEDIA' | 'AMBASSADOR' | 'COACHING';
+  retirementDecisionMade?: boolean;
+  farewell?: boolean;
+  isCaptain?: boolean;
+  captaincyYear?: number;
+  lowChemistryStreak?: number;
+  captainSpeechUsed?: boolean;
+  leagueGender?: LeagueGender;
 }
 
 export interface SeasonHistory {
@@ -275,13 +295,15 @@ export interface Team {
   stadium: Stadium; // Replaced string homeGround with Stadium object
   colors: [string, string];
   logo?: string; // Emoji or image URL for team logo
+  culture?: CultureType;
+  history?: ClubHistory;
 }
 
 export interface MatchEvent {
   quarter: number;
   time: string;
   description: string;
-  type: 'GOAL' | 'BEHIND' | 'MARK' | 'TACKLE' | 'INJURY' | 'GENERIC' | 'RIVALRY' | 'POSSESSION' | 'TURNOVER' | 'FREE_KICK';
+  type: 'GOAL' | 'BEHIND' | 'MARK' | 'TACKLE' | 'INJURY' | 'GENERIC' | 'RIVALRY' | 'POSSESSION' | 'TURNOVER' | 'FREE_KICK' | 'ONE_ON_ONE' | 'ONE_ON_ONE_DEFENSIVE' | 'HIT_OUT' | 'INTERCEPT';
   isPlayerInvolved: boolean;
   teamId?: string; 
 }
@@ -310,7 +332,10 @@ export interface MatchResult {
   newRivalry?: Rivalry;
   playerInjury?: PlayerInjury; 
   achievedMilestones?: Milestone[]; 
-  topPerformers: PerformerStats[]; 
+  topPerformers: PerformerStats[];
+  highlights?: MatchEvent[];
+  energyUsed?: number;
+  tactic?: Tactic;
 }
 
 export interface Fixture {
@@ -356,7 +381,7 @@ export interface DraftClass {
 
 export interface CareerEvent {
   id: string;
-  type: 'PERSONAL' | 'PROFESSIONAL' | 'RIVALRY' | 'TEAMMATE' | 'INJURY' | 'FINANCIAL' | 'OPPORTUNITY' | 'CRISIS';
+  type: 'PERSONAL' | 'PROFESSIONAL' | 'RIVALRY' | 'TEAMMATE' | 'INJURY' | 'FINANCIAL' | 'OPPORTUNITY' | 'CRISIS' | 'FAN_MAIL' | 'RIVALRY_EVENT';
   category: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' | 'CHOICE';
   title: string;
   description: string;
@@ -401,6 +426,9 @@ export interface CareerEventEffect {
   // Narrative items
   addRivalry?: Rivalry;
   unlockAchievement?: string; // Achievement ID to unlock
+
+  // Rivalry resolution
+  rivalryResolved?: boolean; // Mark the first active rivalry as resolved
 
   // Text feedback
   resultText?: string; // Describe what happened
@@ -661,4 +689,38 @@ export interface CoachingChoice {
     resultText: string;
   };
   risk?: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+// ===== LEAGUE GENDER =====
+
+export type LeagueGender = 'MENS' | 'WOMENS';
+
+// ===== CLUB CULTURE =====
+
+export type CultureType =
+  'PREMIERSHIP_HUNGRY' | 'REBUILDING' | 'STORIED_CLUB' | 'UNDERDOG' | 'BIG_CITY';
+
+// ===== CLUB HISTORY =====
+
+export interface ClubRecord {
+  playerName: string;
+  value: number;
+  year: number;
+}
+
+export interface ClubHistory {
+  foundingYear: number;
+  premierships: number[];
+  allTimeGoals: ClubRecord;
+  allTimeCaps: ClubRecord;
+  allTimeDisposals: ClubRecord;
+}
+
+// ===== RIVALRY EXPANSION =====
+
+export interface RivalryEvent {
+  round: number;
+  year: number;
+  description: string;
+  intensityChange: number;
 }

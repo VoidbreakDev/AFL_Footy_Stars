@@ -15,6 +15,18 @@ export const TEAM_NAMES_AFL = [
   "Collingwood", "Carlton", "Essendon", "Richmond", "Hawthorn", "Geelong", "Sydney", "Brisbane"
 ];
 
+export const TEAM_NAMES_LOCAL_W = [
+  "She-Devils", "Stingrays", "Kookaburras", "Vixens", "Darters", "Wrens", "Fillies", "Tigresses"
+];
+
+export const TEAM_NAMES_STATE_W = [
+  "Tempest", "Valkyries", "Phoenix", "Banshees", "Sirens", "Raptors", "Storm", "Vipers"
+];
+
+export const TEAM_NAMES_AFLW = [
+  "Adelaide", "Brisbane Lions", "Carlton", "Collingwood", "Essendon", "Fremantle", "Geelong", "Gold Coast"
+];
+
 // Team Logo Mappings
 // For local images: place files in public/images/logos/[league]/[teamname].png
 // Files in public/ are served from root (e.g., /images/logos/local/mudcrabs.png)
@@ -225,6 +237,9 @@ export const SHOP_ITEMS = [
   { id: 'stamina_course', name: 'Stamina Course', description: '+1 permanent stamina', price: 1000, icon: '💪', category: 'TRAINING' as const, effect: { type: 'ATTRIBUTE_BOOST' as const, value: 1, attribute: 'stamina' as const }, oneTime: true },
   { id: 'goal_sense_training', name: 'Goal Sense Training', description: '+1 permanent goal sense', price: 1000, icon: '🎯', category: 'TRAINING' as const, effect: { type: 'ATTRIBUTE_BOOST' as const, value: 1, attribute: 'goalSense' as const }, oneTime: true },
 
+  // VETERAN ITEMS
+  { id: 'veteran_boost', name: 'Peak Conditioning Programme', description: 'Negates all attribute decline for one full season (age 30+). One use — consumed at season end.', price: 8000, icon: '🏋️', category: 'RECOVERY' as const, effect: { type: 'COSMETIC' as const, value: 0 } },
+
   // CAREER ITEMS (One-time purchases with special effects)
   { id: 'agent', name: 'Hire Agent', description: 'Better transfer offers', price: 5000, icon: '💼', category: 'CAREER' as const, effect: { type: 'COSMETIC' as const, value: 0 }, oneTime: true },
   { id: 'pr_manager', name: 'PR Manager', description: 'Boost fan popularity', price: 3000, icon: '📱', category: 'CAREER' as const, effect: { type: 'COSMETIC' as const, value: 0 }, oneTime: true },
@@ -331,7 +346,8 @@ export const AWARD_ICONS = {
 // ===== CAREER EVENTS & RANDOM ENCOUNTERS =====
 
 export interface CareerEventTemplate {
-  type: 'PERSONAL' | 'PROFESSIONAL' | 'RIVALRY' | 'TEAMMATE' | 'INJURY' | 'FINANCIAL' | 'OPPORTUNITY' | 'CRISIS';
+  id?: string;
+  type: 'PERSONAL' | 'PROFESSIONAL' | 'RIVALRY' | 'TEAMMATE' | 'INJURY' | 'FINANCIAL' | 'OPPORTUNITY' | 'CRISIS' | 'FAN_MAIL' | 'RIVALRY_EVENT';
   category: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' | 'CHOICE';
   title: string;
   description: string;
@@ -829,7 +845,128 @@ export const CAREER_EVENT_TEMPLATES: CareerEventTemplate[] = [
       fanFollowers: 500,
       resultText: 'Small moments like this remind you why you play.'
     }
-  }
+  },
+
+  // ===== FAN MAIL EVENTS =====
+  {
+    id: 'fan_mail_young_supporter',
+    type: 'FAN_MAIL',
+    category: 'CHOICE',
+    title: 'Young Supporter',
+    description: 'A junior footballer has written asking for career advice.',
+    icon: '👦',
+    rarity: 'UNCOMMON',
+    choices: [
+      { id: 'MENTOR', label: 'Mentor Them', description: 'Take time to help', icon: '🤝', effects: { morale: 5, mediaReputation: 3 } },
+      { id: 'BRUSH_OFF', label: 'Too Busy', description: "You're in the middle of a season", icon: '🚫', effects: {} },
+    ]
+  },
+  {
+    id: 'fan_mail_superfan',
+    type: 'FAN_MAIL',
+    category: 'CHOICE',
+    title: 'Superfan Obsession',
+    description: 'An overly devoted fan keeps showing up at training sessions.',
+    icon: '😤',
+    rarity: 'UNCOMMON',
+    choices: [
+      { id: 'ACKNOWLEDGE', label: 'Acknowledge Them', description: 'Give them a wave and a moment', icon: '👋', effects: { fanFollowers: 200 } },
+      { id: 'SET_LIMITS', label: 'Set Boundaries', description: 'Politely ask them to keep their distance', icon: '🚧', effects: { morale: 3, mediaReputation: -2 } },
+    ]
+  },
+  {
+    id: 'fan_mail_critical_doubter',
+    type: 'FAN_MAIL',
+    category: 'CHOICE',
+    title: 'Critical Doubter',
+    description: 'A fan publicly questions your ability on social media.',
+    icon: '👎',
+    rarity: 'UNCOMMON',
+    choices: [
+      { id: 'PROVE_WRONG', label: 'Prove Them Wrong', description: 'Use it as fuel', icon: '🔥', effects: { morale: 5 } },
+      { id: 'IGNORE', label: 'Ignore It', description: "Don't feed the negativity", icon: '🙄', effects: {} },
+    ]
+  },
+  {
+    id: 'fan_mail_charity',
+    type: 'FAN_MAIL',
+    category: 'CHOICE',
+    title: 'Charity Request',
+    description: 'A fan asks you to support a local community fundraiser.',
+    icon: '❤️',
+    rarity: 'UNCOMMON',
+    choices: [
+      { id: 'DONATE', label: 'Donate ($500)', description: 'Give back to the community', icon: '💸', effects: { wallet: -500, mediaReputation: 10 } },
+      { id: 'DECLINE', label: 'Decline', description: 'Keep your funds for now', icon: '🚫', effects: {} },
+    ]
+  },
+  {
+    id: 'fan_mail_hospital',
+    type: 'FAN_MAIL',
+    category: 'CHOICE',
+    title: "Kids' Hospital Visit",
+    description: "You've been invited to visit children at the local hospital.",
+    icon: '🏥',
+    rarity: 'UNCOMMON',
+    choices: [
+      { id: 'ATTEND', label: 'Attend', description: 'Make their day', icon: '💛', effects: { morale: 8, fanFollowers: 500 } },
+      { id: 'SKIP', label: 'Skip', description: 'Too busy this week', icon: '🚫', effects: { mediaReputation: -5 } },
+    ]
+  },
+  {
+    id: 'fan_mail_tribute_video',
+    type: 'FAN_MAIL',
+    category: 'CHOICE',
+    title: 'Fan Tribute Video',
+    description: 'Supporters created a highlights video in your honour.',
+    icon: '🎬',
+    rarity: 'UNCOMMON',
+    choices: [
+      { id: 'SHARE_IT', label: 'Share It', description: 'Post it for everyone to see', icon: '📲', effects: { fanFollowers: 200 } },
+      { id: 'PRIVATE_MOMENT', label: 'Keep It Private', description: 'A personal moment to cherish', icon: '🤍', effects: { morale: 5 } },
+    ]
+  },
+
+  // ===== RIVALRY EVENT TEMPLATES =====
+  {
+    id: 'rivalry_trash_talk',
+    type: 'RIVALRY_EVENT',
+    category: 'CHOICE',
+    title: 'Pre-Match Trash Talk',
+    description: 'Your rival was quoted in the media before your upcoming clash.',
+    icon: '🗣️',
+    rarity: 'UNCOMMON',
+    choices: [
+      { id: 'CLAP_BACK', label: 'Fire Back', description: 'Hit back with confidence', icon: '🔥', effects: { morale: 5 } },
+      { id: 'STAY_FOCUSED', label: 'Stay Focused', description: 'Ignore the noise', icon: '🎯', effects: {} },
+    ]
+  },
+  {
+    id: 'rivalry_handshake',
+    type: 'RIVALRY_EVENT',
+    category: 'CHOICE',
+    title: 'Post-Match Handshake',
+    description: 'After beating your rival, a moment of sportsmanship awaits.',
+    icon: '🤝',
+    rarity: 'UNCOMMON',
+    choices: [
+      { id: 'RESPECT', label: 'Show Respect', description: 'Be magnanimous in victory', icon: '🫡', effects: { mediaReputation: 5 } },
+      { id: 'GLOAT', label: 'Gloat', description: 'Let them know it', icon: '😏', effects: { fanFollowers: 200 } },
+    ]
+  },
+  {
+    id: 'rivalry_resolved',
+    type: 'RIVALRY_EVENT',
+    category: 'CHOICE',
+    title: 'Rivalry Resolved',
+    description: "After five wins over your rival, you've proven your dominance.",
+    icon: '🏅',
+    rarity: 'RARE',
+    choices: [
+      { id: 'BURY_HATCHET', label: 'Bury the Hatchet', description: 'End it with class', icon: '🕊️', effects: { rivalryResolved: true } },
+      { id: 'KEEP_FIRE', label: 'Keep the Fire Burning', description: 'The rivalry lives on', icon: '🔥', effects: { morale: 2 } },
+    ]
+  },
 ];
 
 // ===== TEAM CHEMISTRY & RELATIONSHIPS =====

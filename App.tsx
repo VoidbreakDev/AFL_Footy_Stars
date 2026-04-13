@@ -22,6 +22,7 @@ import CareerEvents from './components/CareerEvents';
 import TeamChemistry from './components/TeamChemistry';
 import CoachingStaff from './components/CoachingStaff';
 import MasterSkillTree from './components/MasterSkillTree';
+import SlotSelect from './components/SlotSelect';
 
 const ScreenSelector: React.FC = () => {
   const { view, player, draftClass, draftProspect, simulateDraft, completeDraft } = useGame();
@@ -78,6 +79,8 @@ const ScreenSelector: React.FC = () => {
         return <Settings />;
     case 'CAREER_SUMMARY':
         return <CareerSummary />;
+    case 'SLOT_SELECT':
+        return <SlotSelect />;
     default:
       return <Dashboard />;
   }

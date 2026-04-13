@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 
 const Settings: React.FC = () => {
-  const { saveGame, loadGame, setView, retirePlayer } = useGame();
+  const { saveGame, loadGame, setView, retirePlayer, currentSlot, setPlayer } = useGame();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [musicVol, setMusicVol] = useState(50);
   const [sfxVol, setSfxVol] = useState(80);
@@ -61,6 +61,17 @@ const Settings: React.FC = () => {
               </button>
           </div>
 
+          <button
+            onClick={() => {
+              setPlayer(prev => prev ? { ...prev, seenTips: {} } : null);
+              setFeedback("Tips reset! They'll show again next visit.");
+              setTimeout(() => setFeedback(null), 2000);
+            }}
+            className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl uppercase text-sm active:scale-95 transition-all"
+          >
+            Reset Tutorial Tips
+          </button>
+
           {feedback && (
               <div className="mt-4 p-3 bg-slate-900/50 rounded-lg text-center text-white font-bold animate-pulse border border-slate-600">
                   {feedback}
@@ -102,6 +113,23 @@ const Settings: React.FC = () => {
                   />
               </div>
           </div>
+      </div>
+
+      {/* CHANGE CAREER / SLOT SELECT */}
+      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 mb-8">
+          <h3 className="text-blue-400 font-bold uppercase text-sm mb-1 border-b border-slate-700 pb-2">Career Slots</h3>
+          <p className="text-slate-400 text-xs mb-4">Currently on Career Slot {currentSlot + 1}. Switch between careers without losing progress.</p>
+          <button
+            onClick={() => {
+              if (window.confirm('Switch careers? Your current round will be saved first.')) {
+                saveGame();
+                setView('SLOT_SELECT');
+              }
+            }}
+            className="w-full py-3 bg-blue-700 hover:bg-blue-600 text-white font-bold rounded-xl uppercase text-sm active:scale-95 transition-all"
+          >
+            🔄 Change Career
+          </button>
       </div>
 
       {/* DANGER ZONE / RETIREMENT */}
