@@ -225,6 +225,9 @@ export const SHOP_ITEMS = [
   { id: 'stamina_course', name: 'Stamina Course', description: '+1 permanent stamina', price: 1000, icon: '💪', category: 'TRAINING' as const, effect: { type: 'ATTRIBUTE_BOOST' as const, value: 1, attribute: 'stamina' as const }, oneTime: true },
   { id: 'goal_sense_training', name: 'Goal Sense Training', description: '+1 permanent goal sense', price: 1000, icon: '🎯', category: 'TRAINING' as const, effect: { type: 'ATTRIBUTE_BOOST' as const, value: 1, attribute: 'goalSense' as const }, oneTime: true },
 
+  // VETERAN ITEMS
+  { id: 'veteran_boost', name: 'Peak Conditioning Programme', description: 'Negates all attribute decline for one full season (age 30+). One use — consumed at season end.', price: 8000, icon: '🏋️', category: 'RECOVERY' as const, effect: { type: 'COSMETIC' as const, value: 0 } },
+
   // CAREER ITEMS (One-time purchases with special effects)
   { id: 'agent', name: 'Hire Agent', description: 'Better transfer offers', price: 5000, icon: '💼', category: 'CAREER' as const, effect: { type: 'COSMETIC' as const, value: 0 }, oneTime: true },
   { id: 'pr_manager', name: 'PR Manager', description: 'Boost fan popularity', price: 3000, icon: '📱', category: 'CAREER' as const, effect: { type: 'COSMETIC' as const, value: 0 }, oneTime: true },

@@ -1,4 +1,5 @@
 import { PlayerProfile, Team, LeagueTier, SeasonHistory } from '../types';
+import { calculateLegacyScore } from './legacyUtils';
 
 /**
  * Determines if player should be promoted based on ladder position and performance
@@ -124,6 +125,54 @@ export const getSalaryMultiplier = (tier: LeagueTier): number => {
         default:
             return 1.0;
     }
+};
+
+/**
+ * Applies age-related attribute decline (speed/stamina) from age 30+.
+ * Kicking and marking get a small experience buff to partially offset decline.
+ * Returns updated player with legacy score recalculated.
+ */
+export const applyAgingEffects = (player: PlayerProfile): PlayerProfile => {
+    if (player.age < 30) {
+        return { ...player, legacyScore: calculateLegacyScore(player) };
+    }
+
+    const hasFitnessTrainer = player.coachingStaff?.staffMembers?.some(
+        s => s.role === 'FITNESS_TRAINER'
+    ) ?? false;
+
+    const hasVeteranBoost = player.itemsPurchased?.includes('veteran_boost') ?? false;
+
+    let speedDecline = player.age >= 33 ? 2 : 1;
+    let staminaDecline = player.age >= 33 ? 2 : 1;
+
+    if (hasFitnessTrainer) {
+        speedDecline = Math.max(0, Math.floor(speedDecline / 2));
+        staminaDecline = Math.max(0, Math.floor(staminaDecline / 2));
+    }
+
+    let updatedPlayer = player;
+    if (hasVeteranBoost) {
+        speedDecline = 0;
+        staminaDecline = 0;
+        updatedPlayer = {
+            ...player,
+            itemsPurchased: player.itemsPurchased?.filter(id => id !== 'veteran_boost') ?? []
+        };
+    }
+
+    const updatedWithDecline = {
+        ...updatedPlayer,
+        attributes: {
+            ...updatedPlayer.attributes,
+            speed: Math.max(20, updatedPlayer.attributes.speed - speedDecline),
+            stamina: Math.max(20, updatedPlayer.attributes.stamina - staminaDecline),
+            kicking: Math.min(updatedPlayer.potential, updatedPlayer.attributes.kicking + 1),
+            marking: Math.min(updatedPlayer.potential, updatedPlayer.attributes.marking + 1),
+        }
+    };
+
+    return { ...updatedWithDecline, legacyScore: calculateLegacyScore(updatedWithDecline) };
 };
 
 /**

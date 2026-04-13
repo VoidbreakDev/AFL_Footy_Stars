@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { PlayerProfile, Team, Fixture, LeagueTier, Position, MatchResult, MatchEvent, Rivalry, PlayerInjury, Milestone, PerformerStats, Award, DraftClass, CareerEvent } from '../types';
+import { PlayerProfile, Team, Fixture, LeagueTier, Position, MatchResult, MatchEvent, Rivalry, PlayerInjury, Milestone, PerformerStats, Award, DraftClass, CareerEvent, Tactic } from '../types';
 import { SEASON_LENGTH, TEAM_NAMES_LOCAL, FIRST_NAMES, LAST_NAMES, MILESTONES, RETIREMENT_AGE, SHOP_ITEMS } from '../constants';
 import { generateLeague, generateFixtures, updateLadderTeam, generateSemiFinals, generateGrandFinal } from '../utils/leagueUtils';
 import { calculateMatchOutcome, simulateCPUMatch } from '../utils/simulationUtils';
@@ -8,7 +8,7 @@ import { checkAchievements } from '../utils/achievementUtils';
 import { canClaimDailyReward, claimDailyReward } from '../utils/dailyRewardUtils';
 import { shouldUpdateNickname, generateNickname } from '../utils/nicknameUtils';
 import { generateTransferOffers, shouldGenerateOffers, clearExpiredOffers, acceptTransferOffer } from '../utils/transferUtils';
-import { shouldPromote, shouldRelegate, getPromotedTier, getRelegatedTier, createSeasonHistory, generateNewSeasonSalary } from '../utils/seasonUtils';
+import { shouldPromote, shouldRelegate, getPromotedTier, getRelegatedTier, createSeasonHistory, generateNewSeasonSalary, applyAgingEffects } from '../utils/seasonUtils';
 import { calculateSeasonAwards } from '../utils/awardUtils';
 import { createDraftClass, shouldHoldDraft, simulateDraftPick, isPlayerDraftEligible, generateDraftClassWithPlayer, wasPlayerDrafted } from '../utils/draftUtils';
 import { processLeagueRosterTurnover } from '../utils/rosterUtils';
@@ -24,7 +24,9 @@ interface GameContextType {
   fixtures: Fixture[];
   currentRound: number;
   startNewGame: (profile: PlayerProfile) => void;
-  generateMatchSimulation: (fixtureIndex: number) => MatchResult;
+  generateMatchSimulation: (fixtureIndex: number, tactic?: Tactic) => MatchResult;
+  setRehabChoice: (choice: 'REST' | 'LIGHT' | 'PUSH') => void;
+  useCaptainSpeech: () => void;
   commitMatchResult: (fixtureIndex: number, result: MatchResult) => void;
   trainAttribute: (attr: keyof PlayerProfile['attributes']) => void;
   advanceRound: () => void;
@@ -251,14 +253,39 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const generateMatchSimulation = (fixtureIndex: number): MatchResult => {
+  const generateMatchSimulation = (fixtureIndex: number, tactic: Tactic = 'BALANCED'): MatchResult => {
       const fixture = fixtures[fixtureIndex];
       const homeTeam = league.find(t => t.id === fixture.homeTeamId);
       const awayTeam = league.find(t => t.id === fixture.awayTeamId);
-      
+
       if(!homeTeam || !awayTeam || !player) throw new Error("Invalid match data");
 
-      return calculateMatchOutcome(homeTeam, awayTeam, player, currentRound);
+      return calculateMatchOutcome(homeTeam, awayTeam, player, currentRound, tactic);
+  };
+
+  const setRehabChoice = (choice: 'REST' | 'LIGHT' | 'PUSH') => {
+      setPlayer(prev => {
+          if (!prev || !prev.injury) return prev;
+          return { ...prev, injury: { ...prev.injury, rehabChoice: choice } };
+      });
+  };
+
+  const useCaptainSpeech = () => {
+      setPlayer(prev => {
+          if (!prev || !prev.isCaptain || prev.captainSpeechUsed) return prev;
+          const updatedTeammates = prev.teammates?.map(t =>
+              ['ENEMY', 'RIVAL', 'STRANGER'].includes(t.relationship)
+                  ? { ...t, relationship: 'ACQUAINTANCE' as const }
+                  : t
+          ) ?? [];
+          return {
+              ...prev,
+              captainSpeechUsed: true,
+              morale: Math.min(100, (prev.morale ?? 0) + 15),
+              motivationBoost: 15,
+              teammates: updatedTeammates,
+          };
+      });
   };
 
   const commitMatchResult = (fixtureIndex: number, result: MatchResult) => {
@@ -453,15 +480,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const newWallet = (prev.wallet || 0) + matchPayment;
           const newLifetimeEarnings = (prev.lifetimeEarnings || 0) + matchPayment;
 
-          // Calculate energy drain based on match intensity
-          // Base drain: 10-20 energy
-          // Additional factors: disposals (workload), tackles (physical effort), injury
-          const baseEnergyDrain = Math.floor(Math.random() * 11) + 10; // 10-20
-          const disposalDrain = Math.floor(result.playerStats.disposals / 10); // ~1-3 extra per 10 disposals
-          const tackleDrain = Math.floor(result.playerStats.tackles / 5); // ~1-2 extra per 5 tackles
-          const injuryDrain = result.playerInjury ? 10 : 0; // Extra 10 if injured
-          const totalEnergyDrain = baseEnergyDrain + disposalDrain + tackleDrain + injuryDrain;
-          const newEnergy = Math.max(0, prev.energy - totalEnergyDrain);
+          // Energy drain from match — use simulation-computed value when available
+          const energyDrain = result.energyUsed ?? (Math.floor(Math.random() * 11) + 10);
+          const injuryDrain = result.playerInjury ? 10 : 0;
+          const newEnergy = Math.max(0, prev.energy - energyDrain - injuryDrain);
 
           // Create updated player for achievement checking
           const updatedPlayer: PlayerProfile = {
@@ -683,9 +705,32 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setPlayer(prev => {
           if(!prev) return null;
           let updatedInjury = prev.injury;
+          let rehabMoraleBonus = 0;
           if(prev.injury) {
-              const weeksLeft = prev.injury.weeksRemaining - 1;
-              updatedInjury = weeksLeft <= 0 ? null : { ...prev.injury, weeksRemaining: weeksLeft };
+              const hasPhysio = prev.coachingStaff?.staffMembers?.some((s: any) => s.role === 'PHYSIO') ?? false;
+              let weekReduction = 1;
+              const roll = Math.random();
+              switch (prev.injury.rehabChoice) {
+                  case 'LIGHT': {
+                      const healChance = hasPhysio ? 0.60 : 0.50;
+                      if (roll < healChance) weekReduction = 2;
+                      else if (roll > 0.90) weekReduction = -1;
+                      break;
+                  }
+                  case 'PUSH': {
+                      const reinjuryRisk = hasPhysio ? 0.15 : 0.25;
+                      if (roll < 0.30) weekReduction = 3;
+                      else if (roll > (1 - reinjuryRisk)) weekReduction = -2;
+                      break;
+                  }
+                  default:
+                      rehabMoraleBonus = 3;
+                      break;
+              }
+              const newWeeks = prev.injury.weeksRemaining - weekReduction;
+              updatedInjury = newWeeks <= 0
+                  ? null
+                  : { ...prev.injury, weeksRemaining: Math.max(1, newWeeks), rehabChoice: undefined };
           }
 
           // Age increment and contract management at end of season
@@ -893,6 +938,77 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               };
           }
 
+          // Retirement decision event at season end (age 33+)
+          let updatedActiveEvents = prev.activeCareerEvents ?? [];
+          if (seasonEnded && newAge >= 33 && !prev.retirementDecisionMade) {
+              const retirementEvent: any = {
+                  id: `retirement-decision-${newCurrentYear}`,
+                  title: 'Retirement Decision',
+                  description: `You're ${newAge} — the twilight of your career beckons. What's your plan?`,
+                  type: 'PROFESSIONAL',
+                  category: 'CHOICE',
+                  icon: '🎓',
+                  round: nextRound,
+                  year: newCurrentYear,
+                  resolved: false,
+                  rarity: 'EPIC',
+                  choices: [
+                      { id: 'RETIRE_NOW', label: 'Retire This Season', description: 'Play out the season then hang up the boots', icon: '🎓', effects: {}, risk: 'LOW' },
+                      { id: 'ONE_MORE', label: 'Play One More Year', description: 'One final season, then call it done', icon: '⏳', effects: {}, risk: 'LOW' },
+                      { id: 'KEEP_GOING', label: 'Keep Going', description: 'Not done yet — push on', icon: '💪', effects: {}, risk: 'LOW' },
+                  ],
+              };
+              updatedActiveEvents = [...updatedActiveEvents, retirementEvent];
+          }
+
+          // Captaincy eligibility check at season start
+          let captainOfferAdded = false;
+          if (seasonEnded && !prev.isCaptain && (prev.seasonsPlayed ?? 0) >= 3) {
+              const chemState = prev.teamChemistry?.state;
+              if ((chemState === 'HOT' || chemState === 'WARM') && !captainOfferAdded) {
+                  captainOfferAdded = true;
+                  const captainEvent: any = {
+                      id: `captain-offer-${newCurrentYear}`,
+                      title: 'Club Captain Offer',
+                      description: `The club wants you as captain for the ${newCurrentYear} season.`,
+                      type: 'PROFESSIONAL',
+                      category: 'CHOICE',
+                      icon: '📣',
+                      round: nextRound,
+                      year: newCurrentYear,
+                      resolved: false,
+                      rarity: 'RARE',
+                      choices: [
+                          { id: 'ACCEPT', label: 'Accept Captaincy', description: '+10 morale, team captain bonus', icon: '✅', effects: { morale: 10 }, risk: 'LOW' },
+                          { id: 'DECLINE', label: 'Decline', description: 'Stay as a regular player', icon: '❌', effects: {}, risk: 'LOW' },
+                      ],
+                  };
+                  updatedActiveEvents = [...updatedActiveEvents, captainEvent];
+              }
+          }
+
+          // Apply aging effects at season end (speed/stamina decline from 30+)
+          const agingResult = seasonEnded ? applyAgingEffects({ ...prev, age: newAge }) : null;
+
+          // Low-chemistry streak tracking for captains
+          let updatedLowChemStreak = prev.lowChemistryStreak ?? 0;
+          let updatedIsCaptain = prev.isCaptain ?? false;
+          if (updatedIsCaptain) {
+              const chemState = prev.teamChemistry?.state;
+              if (chemState === 'FREEZING' || chemState === 'COLD') {
+                  updatedLowChemStreak += 1;
+                  if (updatedLowChemStreak >= 3) {
+                      updatedIsCaptain = false;
+                      updatedLowChemStreak = 0;
+                  }
+              } else {
+                  updatedLowChemStreak = 0;
+              }
+          }
+
+          // Set farewell flag for retiring player's last match
+          const isFinalRoundBeforeRetirement = (prev as any).retireAtSeasonEnd && nextRound === SEASON_LENGTH;
+
           return {
               ...prev,
               age: newAge,
@@ -901,10 +1017,20 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               seasonsPlayed: newSeasonsPlayed,
               careerHistory: newCareerHistory,
               careerStats: updatedCareerStats,
-              energy: 100, // Restore Energy
+              energy: 100,
+              morale: Math.min(100, (prev.morale ?? 0) + rehabMoraleBonus),
               injury: updatedInjury,
               transferOffers: updatedOffers,
-              coachingStaff: updatedCoachingStaff
+              coachingStaff: updatedCoachingStaff,
+              captainSpeechUsed: seasonEnded ? false : prev.captainSpeechUsed,
+              retirementDecisionMade: (seasonEnded && newAge >= 33 && !prev.retirementDecisionMade) ? true : prev.retirementDecisionMade,
+              activeCareerEvents: updatedActiveEvents,
+              isCaptain: updatedIsCaptain,
+              lowChemistryStreak: updatedLowChemStreak,
+              farewell: isFinalRoundBeforeRetirement ? true : prev.farewell,
+              attributes: agingResult?.attributes ?? prev.attributes,
+              legacyScore: agingResult?.legacyScore ?? prev.legacyScore,
+              itemsPurchased: agingResult?.itemsPurchased ?? prev.itemsPurchased,
           };
       });
 
@@ -1236,7 +1362,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const offer = player.transferOffers?.find(o => o.id === offerId);
       if (!offer) return;
 
-      const updatedPlayer = acceptTransferOffer(player, offer);
+      const updatedPlayer = {
+          ...acceptTransferOffer(player, offer),
+          isCaptain: false,
+          captaincyYear: undefined,
+          captainSpeechUsed: false,
+          lowChemistryStreak: 0,
+      };
       setPlayer(updatedPlayer);
 
       // Update league with new team assignment
@@ -1561,6 +1693,53 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (!event) return;
 
+      // Handle special system events before generic resolution
+      if (eventId.startsWith('captain-offer')) {
+          if (choiceId === 'ACCEPT') {
+              setPlayer(prev => {
+                  if (!prev) return null;
+                  return {
+                      ...prev,
+                      isCaptain: true,
+                      captaincyYear: prev.currentYear,
+                      morale: Math.min(100, (prev.morale ?? 0) + 10),
+                      captainSpeechUsed: false,
+                      activeCareerEvents: (prev.activeCareerEvents || []).filter(e => e.id !== eventId),
+                      careerEventHistory: [...(prev.careerEventHistory || []), { eventId, choiceId, year: prev.currentYear }]
+                  };
+              });
+          } else {
+              setPlayer(prev => {
+                  if (!prev) return null;
+                  return {
+                      ...prev,
+                      activeCareerEvents: (prev.activeCareerEvents || []).filter(e => e.id !== eventId),
+                      careerEventHistory: [...(prev.careerEventHistory || []), { eventId, choiceId, year: prev.currentYear }]
+                  };
+              });
+          }
+          return;
+      }
+
+      if (eventId.startsWith('retirement-decision')) {
+          setPlayer(prev => {
+              if (!prev) return null;
+              const extra: Partial<PlayerProfile> = {};
+              if (choiceId === 'RETIRE_NOW') {
+                  (extra as any).retireAtSeasonEnd = true;
+              } else if (choiceId === 'ONE_MORE') {
+                  extra.retirementDecisionMade = false;
+              }
+              return {
+                  ...prev,
+                  ...extra,
+                  activeCareerEvents: (prev.activeCareerEvents || []).filter(e => e.id !== eventId),
+                  careerEventHistory: [...(prev.careerEventHistory || []), { eventId, choiceId, year: prev.currentYear }]
+              };
+          });
+          return;
+      }
+
       const { updatedPlayer, updatedEvent, history } = resolveCareerEventChoice(player, event, choiceId);
 
       setPlayer(prev => {
@@ -1613,7 +1792,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <GameContext.Provider value={{
-        player, setPlayer, league, fixtures, currentRound, startNewGame, generateMatchSimulation, commitMatchResult, trainAttribute, advanceRound, simulateRound, view, setView, lastMatchResult, saveGame, loadGame, acknowledgeMilestone, retirePlayer, resetGame, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap, seasonAwards, dismissAwardsCeremony, draftClass, draftProspect, simulateDraft, completeDraft, acceptTransfer, rejectTransfer, purchaseItem, respondToMedia: respondToMediaFn, createSocialPost: createSocialPostFn, resolveEvent: resolveEventFn, resolveEventChoice: resolveEventChoiceFn, hireCoachingStaff: hireCoachingStaffFn, showFinalsIntro, dismissFinalsIntro, showSemiFinalsResults, dismissSemiFinalsResults, showGrandFinalResult, dismissGrandFinalResult, currentSlot, setCurrentSlot
+        player, setPlayer, league, fixtures, currentRound, startNewGame, generateMatchSimulation, setRehabChoice, useCaptainSpeech, commitMatchResult, trainAttribute, advanceRound, simulateRound, view, setView, lastMatchResult, saveGame, loadGame, acknowledgeMilestone, retirePlayer, resetGame, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap, seasonAwards, dismissAwardsCeremony, draftClass, draftProspect, simulateDraft, completeDraft, acceptTransfer, rejectTransfer, purchaseItem, respondToMedia: respondToMediaFn, createSocialPost: createSocialPostFn, resolveEvent: resolveEventFn, resolveEventChoice: resolveEventChoiceFn, hireCoachingStaff: hireCoachingStaffFn, showFinalsIntro, dismissFinalsIntro, showSemiFinalsResults, dismissSemiFinalsResults, showGrandFinalResult, dismissGrandFinalResult, currentSlot, setCurrentSlot
     }}>
       {children}
     </GameContext.Provider>

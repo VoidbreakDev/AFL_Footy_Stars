@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useGame } from '../context/GameContext';
 import { generateMatchCommentary } from '../services/geminiService';
-import { MatchResult, MatchEvent, Position, Team } from '../types';
+import { MatchResult, MatchEvent, Position, Team, Tactic } from '../types';
 import Avatar from './Avatar';
 
 const LOADING_MESSAGES = [
@@ -51,6 +51,7 @@ const MatchSim: React.FC = () => {
   const [simStep, setSimStep] = useState(0); // 0=Preview, 1=Q1, 2=Q2, 3=Q3, 4=Q4, 5=Result
   const [resultPage, setResultPage] = useState(1); // 1=Overview, 2=PersonalStats
   const [activeResultTab, setActiveResultTab] = useState<'stats' | 'highlights'>('stats');
+  const [selectedTactic, setSelectedTactic] = useState<Tactic>('BALANCED');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
@@ -131,7 +132,7 @@ const MatchSim: React.FC = () => {
   const awayTeam = isHome ? opponent : myTeam;
 
   const handleStartMatch = () => {
-    const result = generateMatchSimulation(currentFixtureIndex);
+    const result = generateMatchSimulation(currentFixtureIndex, selectedTactic);
     setCurrentSimData(result);
     setSimStep(1);
     setResultPage(1);
@@ -209,6 +210,10 @@ const MatchSim: React.FC = () => {
           case 'TURNOVER': return '🔄';
           case 'FREE_KICK': return '🎺';
           case 'RIVALRY': return '🤬';
+          case 'ONE_ON_ONE': return '⚡';
+          case 'ONE_ON_ONE_DEFENSIVE': return '🛡️';
+          case 'HIT_OUT': return '✊';
+          case 'INTERCEPT': return '🦅';
           default: return '•';
       }
   };
@@ -224,6 +229,10 @@ const MatchSim: React.FC = () => {
           case 'POSSESSION': return 'bg-slate-800 border-blue-500/30';
           case 'MARK': return 'bg-slate-800 border-purple-500/30';
           case 'TACKLE': return 'bg-slate-800 border-orange-500/30';
+          case 'ONE_ON_ONE': return 'bg-slate-800 border-orange-400/40';
+          case 'ONE_ON_ONE_DEFENSIVE': return 'bg-slate-800 border-blue-400/40';
+          case 'HIT_OUT': return 'bg-slate-800 border-purple-400/40';
+          case 'INTERCEPT': return 'bg-slate-800 border-teal-400/40';
           default: return 'bg-slate-800 border-slate-700';
       }
   };
@@ -343,6 +352,54 @@ const MatchSim: React.FC = () => {
                </div>
            </div>
            <div className="px-4 pt-2 pb-4 space-y-3">
+               {player?.farewell && (
+                   <div className="bg-gradient-to-r from-amber-700 to-amber-500 rounded-xl p-4 text-center shadow-lg">
+                       <div className="text-white font-black text-lg">🎓 Farewell Game</div>
+                       <div className="text-amber-100 text-sm mt-0.5">{player.name}'s Last Match</div>
+                   </div>
+               )}
+               {player && player.energy < 30 && (
+                   <div className="bg-red-900/70 border border-red-500/40 rounded-xl p-3 text-red-200 text-sm flex items-center gap-2">
+                       <span>⚠️</span>
+                       <span>Low energy — expect a tough game this round.</span>
+                   </div>
+               )}
+               <div>
+                   <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wide mb-2">Game Plan</h3>
+                   <div className="grid grid-cols-1 gap-2">
+                       {([
+                           { tactic: 'ATTACK' as Tactic, label: '⚔️ Attack', desc: 'Higher scoring chance — burns more energy' },
+                           { tactic: 'BALANCED' as Tactic, label: '⚖️ Balanced', desc: 'No modifier — the default approach' },
+                           { tactic: 'DEFENSIVE' as Tactic, label: '🛡️ Defensive', desc: 'Fewer goals against — lower scoring chance' },
+                       ]).map(({ tactic, label, desc }) => (
+                           <button
+                               key={tactic}
+                               onClick={() => setSelectedTactic(tactic)}
+                               className={`p-3 rounded-xl border text-left transition ${
+                                   selectedTactic === tactic
+                                       ? 'bg-green-700 border-green-400 text-white'
+                                       : 'bg-white/5 border-white/15 text-white/70 hover:bg-white/10'
+                               }`}
+                           >
+                               <span className="font-semibold text-sm">{label}</span>
+                               <span className="text-xs opacity-70 block mt-0.5">{desc}</span>
+                           </button>
+                       ))}
+                       {player?.coachingStaff?.staffMembers?.some(s => s.personality === 'TACTICIAN') && (
+                           <button
+                               onClick={() => setSelectedTactic('PRESS')}
+                               className={`p-3 rounded-xl border text-left transition ${
+                                   selectedTactic === 'PRESS'
+                                       ? 'bg-purple-700 border-purple-400 text-white'
+                                       : 'bg-white/5 border-white/15 text-white/70 hover:bg-white/10'
+                               }`}
+                           >
+                               <span className="font-semibold text-sm">🔒 Press</span>
+                               <span className="text-xs opacity-70 block mt-0.5">High pressure — high energy drain (Tactician unlock)</span>
+                           </button>
+                       )}
+                   </div>
+               </div>
                <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700">
                    <button onClick={() => setPreviewTeamId(homeTeam.id)} className={`flex-1 py-2 text-xs font-bold uppercase rounded transition-colors ${previewTeamId === homeTeam.id ? 'bg-emerald-500 text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}>{homeTeam.name}</button>
                    <button onClick={() => setPreviewTeamId(awayTeam.id)} className={`flex-1 py-2 text-xs font-bold uppercase rounded transition-colors ${previewTeamId === awayTeam.id ? 'bg-emerald-500 text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}>{awayTeam.name}</button>
@@ -420,10 +477,10 @@ const MatchSim: React.FC = () => {
       const homePerformers = allPerformers.filter(p => p.teamId === homeTeam.id);
       const awayPerformers = allPerformers.filter(p => p.teamId === awayTeam.id);
 
-      const homeGoals = [...homePerformers].sort((a,b) => b.goals - a.goals).slice(0,3).filter(p => p.goals > 0);
+      const homeGoals = [...homePerformers].sort((a,b) => b.goals - a.goals).filter(p => p.goals > 0).slice(0,3);
       const homeDisp = [...homePerformers].sort((a,b) => b.disposals - a.disposals).slice(0,3);
 
-      const awayGoals = [...awayPerformers].sort((a,b) => b.goals - a.goals).slice(0,3).filter(p => p.goals > 0);
+      const awayGoals = [...awayPerformers].sort((a,b) => b.goals - a.goals).filter(p => p.goals > 0).slice(0,3);
       const awayDisp = [...awayPerformers].sort((a,b) => b.disposals - a.disposals).slice(0,3);
 
       return (
@@ -649,6 +706,22 @@ const MatchSim: React.FC = () => {
                       </div>
 
                       </>
+                      )}
+
+                      {lastMatchResult?.tactic && lastMatchResult.tactic !== 'BALANCED' && (
+                          <div className="text-white/40 text-xs text-center mt-2">
+                              Game plan: {lastMatchResult.tactic.charAt(0) + lastMatchResult.tactic.slice(1).toLowerCase()}
+                          </div>
+                      )}
+
+                      {player?.farewell && (
+                          <div className="bg-gradient-to-br from-amber-700 to-amber-900 rounded-2xl p-6 text-center mt-4 shadow-xl">
+                              <div className="text-5xl mb-3">🎓</div>
+                              <h2 className="text-white font-black text-2xl">Final Whistle</h2>
+                              <p className="text-amber-200 mt-2 text-sm">
+                                  {player.careerStats?.matches ?? 0} career matches · {player.careerStats?.goals ?? 0} goals
+                              </p>
+                          </div>
                       )}
 
                       <button

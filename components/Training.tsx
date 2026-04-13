@@ -1,12 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { PlayerAttributes } from '../types';
 import { getAvailableMasterSkills } from '../utils/masterSkillUtils';
 import TipCard from './TipCard';
 
 const Training: React.FC = () => {
-  const { player, trainAttribute, setView } = useGame();
+  const { player, trainAttribute, setView, setRehabChoice } = useGame();
+  const [chosenRehab, setChosenRehab] = useState<'REST' | 'LIGHT' | 'PUSH' | null>(null);
 
   if (!player) return null;
 
@@ -25,6 +26,51 @@ const Training: React.FC = () => {
     <div className="p-4 pb-24 min-h-screen bg-slate-900">
 
       <TipCard tipKey="TRAINING" title="Training Tips" body="Spend Skill Points to improve your attributes. Each attribute has a cap set by your potential rating." />
+
+      {/* Injury Rehab Panel — shown instead of training when injured */}
+      {player.injury && (() => {
+          const hasPhysio = player.coachingStaff?.staffMembers?.some(s => s.role === 'PHYSIO') ?? false;
+          const REHAB_OPTIONS = [
+              { choice: 'REST' as const, label: '😴 Rest', desc: 'Normal –1 week recovery. No risk. +3 morale.' },
+              { choice: 'LIGHT' as const, label: '🏃 Train Light', desc: `${hasPhysio ? '60%' : '50%'} chance: heal 1 extra week. 10% re-injury risk.` },
+              { choice: 'PUSH' as const, label: '💪 Push Through', desc: `30% chance: heal 2 extra weeks. ${hasPhysio ? '15%' : '25%'} re-injury risk.` },
+          ];
+          const confirmRehab = (choice: 'REST' | 'LIGHT' | 'PUSH' | null) => {
+              if (!choice) return;
+              setRehabChoice(choice);
+          };
+          return (
+              <div className="bg-red-900/40 rounded-2xl p-5 mb-6">
+                  <h3 className="text-red-200 font-bold text-lg mb-1">🤕 {player.injury!.name}</h3>
+                  <p className="text-red-300/70 text-sm mb-1">{player.injury!.weeksRemaining} week(s) remaining</p>
+                  {hasPhysio && <p className="text-green-300 text-xs mb-4">✓ Physio staff — improved recovery odds active</p>}
+                  <div className="flex flex-col gap-2 mb-4">
+                      {REHAB_OPTIONS.map(({ choice, label, desc }) => (
+                          <button
+                              key={choice}
+                              onClick={() => setChosenRehab(choice)}
+                              className={`p-4 rounded-xl border text-left transition ${
+                                  chosenRehab === choice ? 'bg-white/20 border-white/40' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                              }`}
+                          >
+                              <div className="text-white font-semibold text-sm">{label}</div>
+                              <div className="text-white/60 text-xs mt-0.5">{desc}</div>
+                          </button>
+                      ))}
+                  </div>
+                  <button
+                      onClick={() => confirmRehab(chosenRehab)}
+                      disabled={!chosenRehab}
+                      className="w-full bg-green-600 disabled:opacity-40 text-white rounded-xl py-3 font-bold"
+                  >
+                      Confirm Rehab Plan
+                  </button>
+                  {player.injury?.rehabChoice && (
+                      <p className="text-green-400 text-xs text-center mt-2">✓ {player.injury.rehabChoice} selected for this round</p>
+                  )}
+              </div>
+          );
+      })()}
 
       {/* Header with Energy Bar */}
       <div className="mb-6 sticky top-0 bg-slate-900/95 backdrop-blur z-10 py-2 border-b border-slate-800">
@@ -98,7 +144,12 @@ const Training: React.FC = () => {
                   <div key={attr} className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm relative overflow-hidden group">
                       
                       <div className="flex justify-between items-center mb-2 relative z-10">
-                          <div className="capitalize font-bold text-slate-200 text-lg">{attr.replace(/([A-Z])/g, ' $1').trim()}</div>
+                          <div className="capitalize font-bold text-slate-200 text-lg flex items-center gap-1">
+                              {attr.replace(/([A-Z])/g, ' $1').trim()}
+                              {player.age >= 30 && (attr === 'speed' || attr === 'stamina') && (
+                                  <span className="text-amber-400 text-xs" title="Declining with age — consider Recovery items.">📉</span>
+                              )}
+                          </div>
                           
                           {/* Value Display with Projection */}
                           <div className="flex items-center gap-2 bg-slate-950/50 px-3 py-1 rounded-lg">

@@ -5,7 +5,7 @@ import Avatar from './Avatar';
 import TeamLogo from './TeamLogo';
 
 const ClubHub: React.FC = () => {
-    const { player, setPlayer, setView, league, fixtures, currentRound } = useGame();
+    const { player, setPlayer, setView, league, fixtures, currentRound, useCaptainSpeech } = useGame();
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'CONTRACT' | 'HISTORY'>('OVERVIEW');
     const [transferState, setTransferState] = useState<'IDLE' | 'SEARCHING' | 'OFFERS'>('IDLE');
     const [offers, setOffers] = useState<{ team: Team, salary: number, years: number }[]>([]);
@@ -224,6 +224,37 @@ const ClubHub: React.FC = () => {
                 {/* --- TAB: OVERVIEW --- */}
                 {activeTab === 'OVERVIEW' && (
                     <div className="animate-fade-in">
+                        {/* Captain Badge & Speech */}
+                        {player.isCaptain && (
+                            <div className="bg-yellow-900/40 border border-yellow-500/30 rounded-xl p-4 mb-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-2xl">📣</span>
+                                    <div>
+                                        <div className="text-yellow-200 font-bold">Club Captain</div>
+                                        <div className="text-yellow-400/70 text-xs">Since {player.captaincyYear}</div>
+                                    </div>
+                                </div>
+                                <button
+                                    disabled={!!player.captainSpeechUsed}
+                                    onClick={useCaptainSpeech}
+                                    className={`w-full rounded-xl py-2.5 font-semibold text-sm transition ${
+                                        player.captainSpeechUsed
+                                            ? 'bg-white/10 text-white/30 cursor-not-allowed'
+                                            : 'bg-yellow-600 hover:bg-yellow-500 text-white'
+                                    }`}
+                                >
+                                    {player.captainSpeechUsed
+                                        ? "Captain's Speech used this season"
+                                        : "Captain's Speech — lift the team"}
+                                </button>
+                                {!player.captainSpeechUsed && (
+                                    <p className="text-yellow-400/60 text-xs mt-2 text-center">
+                                        Upgrades all STRANGER+ to ACQUAINTANCE · +15 morale
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         {/* Team Management Buttons */}
                         <div className="grid grid-cols-2 gap-3 mb-6">
                             {/* Team Chemistry */}
