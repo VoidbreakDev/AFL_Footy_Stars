@@ -472,6 +472,21 @@ const MatchSim: React.FC = () => {
       const oppScore = isHome ? lastMatchResult.awayScore : lastMatchResult.homeScore;
       const won = myScore.total > oppScore.total;
 
+      // Quarter / worm derived data
+      const homeQ = lastMatchResult.homeScore.quarters;
+      const awayQ = lastMatchResult.awayScore.quarters;
+      const hasQuarterData = homeQ.length === 4 && awayQ.length === 4;
+      const myQCum  = isHome ? homeQ : awayQ;
+      const oppQCum = isHome ? awayQ : homeQ;
+      const wormPoints = hasQuarterData ? [0, ...myQCum.map((v, i) => v - oppQCum[i])] : [];
+      const isDraw = myScore.total === oppScore.total;
+      const wormColor = won ? '#10b981' : isDraw ? '#f59e0b' : '#ef4444';
+      const wormFill  = won ? 'rgba(16,185,129,0.12)' : isDraw ? 'rgba(245,158,11,0.10)' : 'rgba(239,68,68,0.10)';
+      const maxAbs = wormPoints.length ? Math.max(...wormPoints.map(Math.abs), 30) : 30;
+      const yScale = 45 / maxAbs;
+      const wy = (m: number) => 60 - Math.max(-45, Math.min(45, m * yScale));
+      const wx = (i: number) => 30 + i * 60;
+
       const allPerformers = lastMatchResult.topPerformers || [];
       
       const homePerformers = allPerformers.filter(p => p.teamId === homeTeam.id);
@@ -513,6 +528,79 @@ const MatchSim: React.FC = () => {
                       </div>
 
                       <div className="flex-1 overflow-y-auto min-h-0">
+
+                          {/* Score Worm */}
+                          {hasQuarterData && (
+                              <div className="bg-slate-800 rounded-xl border border-slate-700 mb-4 p-4">
+                                  <h3 className="text-emerald-400 font-bold uppercase text-xs mb-3 tracking-widest">Score Worm</h3>
+                                  <svg viewBox="0 0 300 120" className="w-full" preserveAspectRatio="none">
+                                      <line x1="30" y1="60" x2="270" y2="60" stroke="#334155" strokeWidth="1" strokeDasharray="4,3" />
+                                      {[1,2,3].map(i => (
+                                          <line key={i} x1={wx(i)} y1="18" x2={wx(i)} y2="102" stroke="#1e293b" strokeWidth="1" />
+                                      ))}
+                                      <polygon
+                                          points={[...wormPoints.map((m,i) => `${wx(i)},${wy(m)}`), `${wx(4)},60`, `${wx(0)},60`].join(' ')}
+                                          fill={wormFill}
+                                      />
+                                      <polyline
+                                          points={wormPoints.map((m,i) => `${wx(i)},${wy(m)}`).join(' ')}
+                                          fill="none" stroke={wormColor} strokeWidth="2.5"
+                                          strokeLinejoin="round" strokeLinecap="round"
+                                      />
+                                      {wormPoints.map((m,i) => (
+                                          <circle key={i} cx={wx(i)} cy={wy(m)} r="4"
+                                              fill={wormColor} stroke="#1e293b" strokeWidth="2" />
+                                      ))}
+                                      {(['S','Q1','Q2','Q3','Q4'] as const).map((label,i) => (
+                                          <text key={i} x={wx(i)} y="115" textAnchor="middle" fontSize="9" fill="#64748b" fontWeight="bold">{label}</text>
+                                      ))}
+                                      <text x="8" y="22" fontSize="8" fill="#64748b" dominantBaseline="middle">{myTeam.name.charAt(0)}</text>
+                                      <text x="8" y="98" fontSize="8" fill="#64748b" dominantBaseline="middle">{opponent.name.charAt(0)}</text>
+                                      {(() => {
+                                          const fm = wormPoints[4];
+                                          const labelY = fm >= 0 ? wy(fm) - 10 : wy(fm) + 16;
+                                          return <text x={wx(4)} y={labelY} textAnchor="middle" fontSize="9" fill={wormColor} fontWeight="bold">
+                                              {fm > 0 ? `+${fm}` : fm === 0 ? 'DRAW' : `${fm}`}
+                                          </text>;
+                                      })()}
+                                  </svg>
+                              </div>
+                          )}
+
+                          {/* Quarter Breakdown */}
+                          {hasQuarterData && (
+                              <div className="bg-slate-800 rounded-xl border border-slate-700 mb-4 overflow-hidden">
+                                  <h3 className="text-emerald-400 font-bold uppercase text-xs px-4 pt-3 pb-2 border-b border-slate-700 tracking-widest">Quarter Breakdown</h3>
+                                  <div className="grid grid-cols-7 text-[10px] font-bold uppercase text-slate-500 px-3 py-2 border-b border-slate-700/50">
+                                      <div className="col-span-2">Team</div>
+                                      <div className="text-center">Q1</div>
+                                      <div className="text-center">Q2</div>
+                                      <div className="text-center">Q3</div>
+                                      <div className="text-center">Q4</div>
+                                      <div className="text-center">Total</div>
+                                  </div>
+                                  {[
+                                      { team: homeTeam, qArr: homeQ, score: lastMatchResult.homeScore },
+                                      { team: awayTeam, qArr: awayQ, score: lastMatchResult.awayScore },
+                                  ].map(({ team, qArr, score }) => (
+                                      <div key={team.id}
+                                          className={`grid grid-cols-7 items-center px-3 py-3 border-b border-slate-700/30 last:border-0 ${team.id === myTeam.id ? 'bg-emerald-900/10' : ''}`}
+                                      >
+                                          <div className="col-span-2 text-[11px] font-bold text-white truncate">{team.name.split(' ')[0]}</div>
+                                          {[0,1,2,3].map(i => (
+                                              <div key={i} className="text-center font-mono text-sm text-slate-300">
+                                                  {qArr[i] - (i > 0 ? qArr[i-1] : 0)}
+                                              </div>
+                                          ))}
+                                          <div className="text-center">
+                                              <span className="font-mono text-sm font-bold text-white">{score.goals}.{score.behinds}</span>
+                                              <span className="font-mono text-[10px] text-slate-400 block">({score.total})</span>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                          )}
+
                           <div className="grid grid-cols-2 gap-4 mb-4">
                               <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700">
                                   <div className="text-xs font-bold text-slate-400 uppercase mb-2 text-center">{homeTeam.name} Best</div>
