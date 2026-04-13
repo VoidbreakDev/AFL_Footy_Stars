@@ -123,7 +123,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const startNewGame = (profile: PlayerProfile) => {
-    const newLeague = generateLeague(LeagueTier.LOCAL);
+    const newLeague = generateLeague(LeagueTier.LOCAL, profile.leagueGender ?? 'MENS');
     
     // 1. Map User Position to a Specific Sub-Position
     let defaultSub = 'INT';
@@ -786,7 +786,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               // Check if player is eligible for AFL draft (from State League)
               if (shouldHoldDraft(prev.contract.tier) && isPlayerDraftEligible(prev)) {
                   // Generate a temporary AFL league for draft pick assignment
-                  const aflLeague = generateLeague(LeagueTier.NATIONAL);
+                  const aflLeague = generateLeague(LeagueTier.NATIONAL, prev.leagueGender ?? 'MENS');
                   const draft = generateDraftClassWithPlayer(newCurrentYear, prev, aflLeague);
                   setDraftClass(draft);
 
@@ -845,7 +845,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                       // Generate new league for new tier
                       setTimeout(() => {
-                          let newLeague = generateLeague(newTier);
+                          let newLeague = generateLeague(newTier, prev.leagueGender ?? 'MENS');
                           const newClubName = newLeague[0].name;
 
                           // Inject player into the new team
@@ -1343,7 +1343,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           // Generate AFL league with player's new team
           setTimeout(() => {
-              let aflLeague = generateLeague(LeagueTier.NATIONAL);
+              let aflLeague = generateLeague(LeagueTier.NATIONAL, player?.leagueGender ?? 'MENS');
 
               // Inject player into the team that drafted them
               if (player) {
@@ -1361,7 +1361,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
           // Player was not drafted - stay in State League for another season
           setTimeout(() => {
-              let stateLeague = generateLeague(LeagueTier.STATE);
+              let stateLeague = generateLeague(LeagueTier.STATE, player?.leagueGender ?? 'MENS');
 
               // Inject player into a State League team
               if (player) {

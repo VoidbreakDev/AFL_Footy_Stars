@@ -421,6 +421,7 @@ const Dashboard: React.FC = () => {
           awards={seasonAwards}
           playerName={player.name}
           onDismiss={dismissAwardsCeremony}
+          leagueGender={player.leagueGender}
         />
       )}
 

@@ -1,4 +1,4 @@
-import { PlayerProfile, Team, LeagueTier, Award } from '../types';
+import { PlayerProfile, Team, LeagueTier, Award, LeagueGender } from '../types';
 import { AwardType } from '../constants';
 
 /**
@@ -231,4 +231,16 @@ const checkLeadingTackler = (player: PlayerProfile, league: Team[]): boolean => 
     );
 
     return competitorTackles.every(tackles => player.seasonStats.tackles > tackles);
+};
+
+
+// Returns gender-appropriate award display name
+export const getAwardName = (type: AwardType, gender?: LeagueGender): string => {
+    if (gender !== 'WOMENS') return type as string;
+    const WOMENS_NAMES: Partial<Record<AwardType, string>> = {
+        [AwardType.BROWNLOW_MEDAL]: 'AFLW Best & Fairest',
+        [AwardType.COLEMAN_MEDAL]: 'AFLW Leading Goalkicker',
+        [AwardType.ALL_AUSTRALIAN]: 'All-Australian Women\'s Team',
+    };
+    return WOMENS_NAMES[type] ?? (type as string);
 };

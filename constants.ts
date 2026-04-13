@@ -15,6 +15,18 @@ export const TEAM_NAMES_AFL = [
   "Collingwood", "Carlton", "Essendon", "Richmond", "Hawthorn", "Geelong", "Sydney", "Brisbane"
 ];
 
+export const TEAM_NAMES_LOCAL_W = [
+  "She-Devils", "Stingrays", "Kookaburras", "Vixens", "Darters", "Wrens", "Fillies", "Tigresses"
+];
+
+export const TEAM_NAMES_STATE_W = [
+  "Tempest", "Valkyries", "Phoenix", "Banshees", "Sirens", "Raptors", "Storm", "Vipers"
+];
+
+export const TEAM_NAMES_AFLW = [
+  "Adelaide", "Brisbane Lions", "Carlton", "Collingwood", "Essendon", "Fremantle", "Geelong", "Gold Coast"
+];
+
 // Team Logo Mappings
 // For local images: place files in public/images/logos/[league]/[teamname].png
 // Files in public/ are served from root (e.g., /images/logos/local/mudcrabs.png)

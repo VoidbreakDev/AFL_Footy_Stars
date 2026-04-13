@@ -1,14 +1,16 @@
 import React from 'react';
-import { Award } from '../types';
-import { AWARD_DESCRIPTIONS, AWARD_ICONS } from '../constants';
+import { Award, LeagueGender } from '../types';
+import { AWARD_DESCRIPTIONS, AWARD_ICONS, AwardType } from '../constants';
+import { getAwardName } from '../utils/awardUtils';
 
 interface Props {
     awards: Award[];
     playerName: string;
     onDismiss: () => void;
+    leagueGender?: LeagueGender;
 }
 
-const AwardsCeremony: React.FC<Props> = ({ awards, playerName, onDismiss }) => {
+const AwardsCeremony: React.FC<Props> = ({ awards, playerName, onDismiss, leagueGender }) => {
     if (awards.length === 0) return null;
 
     return (
@@ -38,7 +40,7 @@ const AwardsCeremony: React.FC<Props> = ({ awards, playerName, onDismiss }) => {
                                     {AWARD_ICONS[award.type as keyof typeof AWARD_ICONS] || '🏆'}
                                 </div>
                                 <h3 className="text-2xl font-black text-yellow-400 uppercase">
-                                    {award.type}
+                                    {getAwardName(award.type as AwardType, leagueGender)}
                                 </h3>
                             </div>
 

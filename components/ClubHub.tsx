@@ -346,6 +346,41 @@ const ClubHub: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Record Watch Banner */}
+                        {myTeam.history && player.careerStats.goals >= myTeam.history.allTimeGoals.value * 0.9 && (
+                            <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-xl p-4 mb-4 flex items-center gap-3">
+                                <span className="text-2xl">🎯</span>
+                                <div>
+                                    <p className="text-yellow-400 font-bold text-sm">Record Watch!</p>
+                                    <p className="text-yellow-300/80 text-xs">
+                                        You need {myTeam.history.allTimeGoals.value - player.careerStats.goals} more goal{myTeam.history.allTimeGoals.value - player.careerStats.goals !== 1 ? 's' : ''} to break {myTeam.history.allTimeGoals.playerName}'s all-time record of {myTeam.history.allTimeGoals.value}.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Club Records */}
+                        {myTeam.history && (
+                            <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 mb-6">
+                                <h3 className="text-emerald-400 font-bold uppercase text-xs mb-3">Club Records</h3>
+                                <div className="space-y-2">
+                                    {[
+                                        { label: 'All-Time Goals', rec: myTeam.history.allTimeGoals },
+                                        { label: 'All-Time Caps', rec: myTeam.history.allTimeCaps },
+                                        { label: 'All-Time Disposals', rec: myTeam.history.allTimeDisposals },
+                                    ].map(({ label, rec }) => (
+                                        <div key={label} className="flex justify-between items-center py-1.5 border-b border-slate-700/50 last:border-0">
+                                            <div>
+                                                <p className="text-white text-sm font-bold">{rec.playerName}</p>
+                                                <p className="text-slate-400 text-xs">{label} · {rec.year}</p>
+                                            </div>
+                                            <span className="text-emerald-400 font-mono font-bold">{rec.value.toLocaleString()}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Recent Results */}
                         <div className="mb-6">
                             <h3 className="text-emerald-400 font-bold uppercase text-xs mb-3 pl-1">Recent Results</h3>

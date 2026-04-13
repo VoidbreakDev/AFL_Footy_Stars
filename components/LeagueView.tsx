@@ -5,7 +5,7 @@ import { SEASON_LENGTH } from '../constants';
 import TeamLogo from './TeamLogo';
 
 const LeagueView: React.FC = () => {
-  const { league, player, fixtures, currentRound } = useGame();
+  const { league, player, fixtures, currentRound, setView } = useGame();
   const [activeTab, setActiveTab] = useState<'LADDER' | 'FIXTURE'>('LADDER');
   const [viewRound, setViewRound] = useState(currentRound);
 
@@ -33,7 +33,12 @@ const LeagueView: React.FC = () => {
     <div className="pb-24 bg-slate-900 min-h-screen">
        {/* HEADER */}
        <div className="p-4 bg-slate-800 border-b border-slate-700 shadow-md">
-           <h2 className="text-3xl font-black text-white italic uppercase mb-4">League Central</h2>
+           <div className="flex items-center gap-3 mb-4">
+               <h2 className="text-3xl font-black text-white italic uppercase">League Central</h2>
+               {player?.leagueGender === 'WOMENS' && (
+                   <span className="bg-pink-600 text-white text-xs font-bold px-2 py-0.5 rounded-full uppercase">AFLW</span>
+               )}
+           </div>
            <div className="flex gap-2 p-1 bg-slate-900 rounded-lg">
                 <button 
                     onClick={() => setActiveTab('LADDER')}
