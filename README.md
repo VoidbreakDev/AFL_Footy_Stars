@@ -2,7 +2,31 @@
 
 A full-featured Australian Football League career simulation game built with React, TypeScript, and Vite. Create a custom player, rise through the ranks from local footy to the AFL, manage your career, and chase legendary status.
 
-**Version:** 1.0.0.0 Beta1 &nbsp;|&nbsp; **Platform:** Web (mobile-first PWA) &nbsp;|&nbsp; **Save system:** LocalStorage (no account required)
+**Version:** 1.3.1 &nbsp;|&nbsp; **Platform:** Web (mobile-first PWA) &nbsp;|&nbsp; **Save system:** LocalStorage (no account required)
+
+---
+
+---
+
+## What's Updated in v1.3 & v1.3.1
+
+### v1.3 — Off-Field Management & Narrative Depth
+- **Career Story Arcs** — season-spanning narrative threads with Setup → Escalation → Resolution acts. 10 arc types (Contract Saga, Rivalry Escalation, Captaincy Journey, Media Firestorm, Redemption Arc, Legacy Chase, Farewell Season, and more)
+- **Media Conference System** — structured pre-match and post-match press interactions with choice-driven reputation consequences
+- **Club Culture Activation** — each club culture type (Premiership Hungry, Rebuilding, Storied Club, Underdog, Big City) now generates unique events and passive gameplay effects
+- **Locker Room Drama** — faction splits, star player fallouts, captain crises, and team-building moments tied to chemistry
+- **Legacy Score Overhaul** — milestone-gated legacy system with 6 tiers (Journeyman → AFL Icon) tracking statistical dominance, awards, longevity, narrative impact, and community standing
+- **Community Engagement** — fan mail interactions, school visits, charity matches, and sponsor appearances that build the sense of a living world
+- **Dynamic Biography** — career story auto-generates each season using Gemini AI (with template fallback), turning your career into a living narrative
+- **Expanded Milestones** — legacy path visualization, new milestone categories (Votes, Awards, Seasons, Chemistry, Legacy, Narrative)
+
+### v1.3.1 — Mobile UI Polish & Navigation Restructure
+- **Bottom Nav Overhaul** — replaced Club tab with new Hub view; all off-field screens (Shop, Transfer Market, Media, Career Events, Achievements, Skills, Settings) now accessible from a unified 2-column grid with dynamic status hints
+- **Shop Redesign** — full mobile-first rewrite: replaced tall card grid with compact ~64px row layout, streamlined category tabs, colour token consistency (`slate-*` / `emerald-*`), improved wallet visibility
+- **Dashboard Cleanup** — removed large Shop banner; added Quick-Access pill row (Train, Shop, Skills, Hub) above the match card for faster navigation
+- **Consistent Back Navigation** — new `BackHeader` component standardises header bar (`sticky`, `backdrop-blur`, 56px height) across all sub-views
+- **Touch Target Audit** — minimum 44×44px compliance: nav labels, notification chips, and category tabs now properly sized for thumb reach
+- **Safe Area Padding** — all scrollable views now use `pb-24` to clear the 80px bottom nav
 
 ---
 
@@ -111,28 +135,35 @@ Win premierships, rack up Brownlow votes, break milestone records, and unlock le
 - **Energy & morale management** — both affect match performance and training capacity
 
 ### Club & team systems
-- **Team chemistry** — 7-tier relationship system with each teammate (Enemy → Best Mate)
-- **Chemistry events** — interactive moments that shift relationships
+- **Team chemistry** — 7-tier relationship system with each teammate (Enemy → Best Mate); locker room drama events affect morale and splits
+- **Chemistry events** — interactive moments that shift relationships (faction splits, star player fallouts, captain crises, celebration moments, training incidents)
+- **Club culture** — 5 culture archetypes (Premiership Hungry, Rebuilding, Storied Club, Underdog, Big City) each generate unique events, passive bonuses, and narrative flavour
 - **Coaching staff** — hire a head coach and support staff (Physio, Fitness Trainer, Nutritionist, Mental Coach, Skills Coach); each has a personality type that affects passive bonuses
-- **Club hub** — view your full squad, stadium, and team colours
+- **Club hub** — unified access point for club info, team roster, stadium details, and team colours; redesigned as a mobile-friendly grid with status hints
 
 ### Media & reputation
-- **Media reputation system** — 6-tier scale from Unknown to Legend
-- **Fan followers** — grow your fanbase through performances and social media
+- **Media reputation system** — 6-tier scale from Unknown to Legend, now actively unlocks/blocks content and generates unique events per tier
+- **Media conferences** — pre-match and post-match press interactions with 2–3 contextual questions; responses affect reputation, fan sentiment, and coaching relationships
+- **Fan followers** — grow your fanbase through performances, community engagement, and social media
 - **Media events** — interviews, controversies, praise, and criticism; respond with HUMBLE / CONFIDENT / IGNORE
 - **Social media posts** — create posts that grow followers and trigger fan milestones
-- **Fan milestones** — unlock titles and icons as your following grows
+- **Fan mail** — periodic fan letters (encouragement, criticism, challenges) with reply options that boost community connection
+- **Community engagement** — school visits, charity matches, sponsor appearances, and local clinic hosting build fan goodwill
 
-### Career events
+### Career events & narrative
 - **30+ random career events** — sponsorships, mentorships, conflicts, community moments, and more
 - **Choice-based outcomes** — most events offer 2–3 responses with different consequences
 - **Event history** — full log of past events for reference
+- **Career Story Arcs** — season-spanning narrative threads (Contract Saga, Rivalry Escalation, Captaincy Journey, Media Firestorm, Legacy Chase, Farewell Season, and more)
+- **Dynamic biography** — auto-generated seasonal career paragraphs using AI (or templates), reflecting your journey
+- **Locker room drama** — faction splits, star player conflicts, team-building moments tied to chemistry dynamics
 
 ### Awards & achievements
 - **9 season award types** — Brownlow Medal, Coleman Medal, All-Australian Team, Club Best & Fairest, Rising Star, Leading Disposal Winner, Leading Tackler, Mark of the Year, Goal of the Year
 - **Awards ceremony** — dedicated end-of-season presentation screen
 - **70+ achievements** — across 5 categories with 4 rarity tiers (Common / Rare / Epic / Legendary)
-- **Milestone gallery** — visual career timeline of match, goal, disposal, and tackle records
+- **Milestone gallery** — visual career timeline with expanded categories: match/goal/disposal/tackle records, votes, awards, seasons, chemistry, legacy tiers, and narrative completions
+- **Legacy Path** — 6-tier system (Journeyman → AFL Icon) tracking statistical dominance, awards, longevity, narrative impact, and community standing; unlock special events and post-career paths at higher tiers
 
 ### Season flow
 - **Finals system** — top 4 qualify; semi-finals and Grand Final each have dedicated screens
@@ -285,17 +316,20 @@ JSON.parse(localStorage.getItem('footyLegendSave'))
 
 ## Roadmap
 
-The `_prompts/` folder contains detailed sub-agent prompts for the v1.1 feature development cycle, organised by category:
+### Completed
+- ✅ **v1.3** — Off-Field Management & Narrative Depth (story arcs, media conferences, club culture, legacy system, community events, dynamic biography)
+- ✅ **v1.3.1** — Mobile UI Polish & Navigation Restructure (Hub view, Shop redesign, Dashboard cleanup, BackHeader standardisation, touch target audit)
 
-| File | Category | Highlights |
-|------|----------|------------|
-| `_prompts/01_GAMEPLAY.md` | Gameplay | Position-specific match roles, energy management, tactical pre-match setup, injury rehab mini-flow |
-| `_prompts/02_PROGRESSION.md` | Progression | Legacy score & career arc, captaincy system, retirement planning, attribute decline with age |
-| `_prompts/03_SOCIAL_MEDIA.md` | Social & Media | Fan mail interactions, club culture archetypes, rivalry lifecycle & head-to-head tracking |
-| `_prompts/04_POLISH_UX.md` | Polish & UX | AFL draft bug fix, 3-slot save system, match highlights reel, onboarding tutorial |
-| `_prompts/05_CONTENT.md` | Content | Training mini-games, club history & record books, AFLW women's league path |
+### v2 Preview (Planned)
+Planned features for future releases:
+- **Coach Mode** — play as a coach managing tactics, halftime adjustments, and team strategy
+- **Player Mode** — on-field decision-making during live match events
+- **Budget Management** — club-level budget system with salary caps
+- **Strategy Board** — pre-match formation setup and matchup assignments
+- **Halftime Address** — locker room decision-making with momentum consequences
+- **Full Media Conference UI** — journalist avatars, live typing effects, camera cinematics
 
-See `_prompts/README.md` for the recommended merge order and coordination notes when running parallel agents.
+All v1.3+ core narrative and legacy systems are designed to support these v2 features.
 
 ---
 
