@@ -50,7 +50,7 @@ const CareerSummary: React.FC = () => {
             <div className="bg-gradient-to-r from-yellow-600 to-amber-500 rounded-2xl p-5 mb-6 text-center shadow-lg">
                 <div className="text-yellow-100/80 text-sm font-semibold">Legacy Score</div>
                 <div className="text-5xl font-black text-white mt-1">{legacyScore}</div>
-                <div className="text-yellow-100 font-semibold text-lg mt-1">{legacyTier}</div>
+                <div className="text-yellow-100 font-semibold text-lg mt-1">{legacyTier.title}</div>
             </div>
 
             {/* Player Card */}

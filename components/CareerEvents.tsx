@@ -100,7 +100,13 @@ const CareerEvents: React.FC = () => {
     if (!selectedEvent || !selectedEvent.choices) return null;
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" style={{ 
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh'
+      }}>
         <div className="bg-gray-900 border-2 border-yellow-500 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6 border-b border-gray-700">
             <div className="flex items-start gap-4 mb-4">

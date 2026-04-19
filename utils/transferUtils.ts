@@ -1,5 +1,63 @@
 import { PlayerProfile, Team, LeagueTier, TransferOffer } from '../types';
 
+// --- FREE AGENCY PERIOD (Rounds 12-14) ---
+export const isFreeAgencyPeriod = (currentRound: number): boolean => {
+    return currentRound >= 12 && currentRound <= 14;
+};
+
+/**
+ * Generate free agency period offers — more aggressive, multiple clubs bid
+ */
+export const generateFreeAgencyOffers = (
+    player: PlayerProfile,
+    currentRound: number,
+    allTeams: Team[],
+): TransferOffer[] => {
+    const offers: TransferOffer[] = [];
+
+    const calculateOverall = (p: PlayerProfile) => {
+        const attrs = Object.values(p.attributes);
+        return Math.round(attrs.reduce((a, b) => a + b, 0) / attrs.length);
+    };
+
+    const playerRating = calculateOverall(player);
+    const currentTier = player.contract.tier;
+
+    // Free agency: more clubs interested, better offers
+    const interestedClubs = allTeams.filter(t =>
+        t.name !== player.contract.clubName && // Not current club
+        Math.random() < (playerRating / 150) // Higher rated players get more interest
+    ).slice(0, 3); // Max 3 free agency offers
+
+    interestedClubs.forEach(club => {
+        const clubTier = club.id.includes('LOCAL') ? LeagueTier.LOCAL :
+                        club.id.includes('STATE') ? LeagueTier.STATE : LeagueTier.NATIONAL;
+
+        // Free agency offers are 10-20% better than regular offers
+        const salaryMultiplier = 1.1 + Math.random() * 0.1;
+        const baseSalary = player.contract.salary * salaryMultiplier;
+        const signingBonus = Math.floor(baseSalary * 0.5); // 50% of annual salary as bonus
+
+        offers.push({
+            id: `fa-${club.id}-${currentRound}-${Date.now()}`,
+            clubName: club.name,
+            tier: clubTier,
+            salary: Math.floor(baseSalary),
+            contractLength: Math.floor(Math.random() * 3) + 1,
+            role: playerRating >= 75 ? 'STAR' : playerRating >= 60 ? 'STARTER' : 'ROTATION',
+            teamRanking: Math.floor(Math.random() * 4) + 1,
+            expiresRound: 14, // All free agency offers expire at end of round 14
+            reason: `${club.name} wants to sign you during free agency`,
+            teamColors: club.colors,
+            isFreeAgency: true,
+            signingBonus,
+            playerOption: Math.random() > 0.7, // 30% chance of player option
+        });
+    });
+
+    return offers;
+};
+
 // Generate transfer offers based on player performance and contract status
 export const generateTransferOffers = (
     player: PlayerProfile,

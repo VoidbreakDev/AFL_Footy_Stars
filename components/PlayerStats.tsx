@@ -3,20 +3,22 @@ import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import Avatar from './Avatar';
 import { getEligibleNicknames, getNameBasedNicknames } from '../utils/nicknameUtils';
+import { PERSONALITY_DESCRIPTIONS, PlayerPersonality } from '../types';
+import CareerTimeline from './CareerTimeline';
 
 const PlayerStatsView: React.FC = () => {
-    const { player, league, setPlayer, setView } = useGame();
-
-    if (!player) return null;
-    const myTeam = league.find(t => t.name === player.contract.clubName);
-
+    const { player, league, setPlayer, setView, currentRound } = useGame();
     const [bio, setBio] = useState(player.bio || "");
     const [isSavingBio, setIsSavingBio] = useState(false);
     const [showNicknameModal, setShowNicknameModal] = useState(false);
+    const [copiedStory, setCopiedStory] = useState(false);
 
     useEffect(() => {
         setBio(player.bio || "");
     }, [player.bio]);
+
+    if (!player) return null;
+    const myTeam = league.find(t => t.name === player.contract.clubName);
 
     const handleSaveBio = () => {
         setIsSavingBio(true);
@@ -27,11 +29,11 @@ const PlayerStatsView: React.FC = () => {
     };
 
     const StatRow = ({ label, season, career }: { label: string, season: number, career: number }) => (
-        <div className="flex justify-between items-center py-3 border-b border-slate-700 last:border-0">
-            <span className="text-slate-400 font-medium">{label}</span>
-            <div className="flex gap-8">
-                <span className="font-mono font-bold w-12 text-right">{season}</span>
-                <span className="font-mono font-bold w-12 text-right text-emerald-400">{career}</span>
+        <div className="flex justify-between items-center py-3 border-b border-slate-700 last:border-0 gap-2">
+            <span className="text-slate-400 font-medium text-xs sm:text-sm flex-shrink truncate">{label}</span>
+            <div className="flex gap-4 sm:gap-8 flex-shrink-0">
+                <span className="font-mono font-bold w-10 sm:w-12 text-right text-xs sm:text-sm">{season}</span>
+                <span className="font-mono font-bold w-10 sm:w-12 text-right text-emerald-400 text-xs sm:text-sm">{career}</span>
             </div>
         </div>
     );
@@ -152,11 +154,27 @@ const PlayerStatsView: React.FC = () => {
                 <p className="text-xs text-slate-500 italic">{moraleConf.desc}</p>
             </div>
 
+            {/* Personality Card */}
+            {player.personality && (() => {
+                const pDesc = PERSONALITY_DESCRIPTIONS[player.personality as PlayerPersonality];
+                if (!pDesc) return null;
+                return (
+                    <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 mb-6">
+                        <div className="flex justify-between items-center mb-2">
+                            <div className="text-xs font-bold text-slate-400 uppercase">Personality</div>
+                            <div className="text-lg">{pDesc.icon}</div>
+                        </div>
+                        <div className="text-white font-bold text-sm mb-1">{pDesc.label}</div>
+                        <p className="text-xs text-slate-500">{pDesc.desc}</p>
+                    </div>
+                );
+            })()}
+
             {/* Stats Card */}
             <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden mb-6">
-                <div className="bg-slate-950 p-3 flex justify-end gap-8 text-xs font-bold text-slate-500 uppercase tracking-wider px-4">
-                    <span className="w-12 text-right">Seas</span>
-                    <span className="w-12 text-right">Car</span>
+                <div className="bg-slate-950 p-3 flex justify-end gap-4 sm:gap-8 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider px-4">
+                    <span className="w-10 sm:w-12 text-right">Seas</span>
+                    <span className="w-10 sm:w-12 text-right">Car</span>
                 </div>
                 <div className="p-4 pt-0">
                     <StatRow label="Matches" season={player.seasonStats.matches} career={player.careerStats.matches} />
@@ -166,6 +184,84 @@ const PlayerStatsView: React.FC = () => {
                     <StatRow label="Brownlow Votes" season={player.seasonStats.votes} career={player.careerStats.votes} />
                 </div>
             </div>
+
+            {/* Extended Stats - Season */}
+            {(player.seasonStats.effectiveDisposals !== undefined || player.seasonStats.kicks !== undefined) && player.seasonStats.matches > 0 && (
+                <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden mb-6">
+                    <div className="bg-slate-950 p-3">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">Detailed Stats (Season)</h3>
+                    </div>
+                    <div className="p-4 pt-0">
+                        {/* Disposal Efficiency */}
+                        {(() => {
+                            const eff = player.seasonStats.effectiveDisposals || 0;
+                            const ineff = player.seasonStats.ineffectiveDisposals || 0;
+                            const total = eff + ineff;
+                            const pct = total > 0 ? Math.round((eff / total) * 100) : 0;
+                            return (
+                                <div className="mb-4">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-slate-400 text-xs font-medium">Disposal Efficiency</span>
+                                        <span className={`text-xs font-bold ${pct > 70 ? 'text-emerald-400' : pct > 50 ? 'text-yellow-400' : 'text-red-400'}`}>{pct}%</span>
+                                    </div>
+                                    <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden mb-1">
+                                        <div className={`h-full rounded-full ${pct > 70 ? 'bg-emerald-500' : pct > 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${pct}%` }}></div>
+                                    </div>
+                                    <div className="text-[10px] text-slate-500">{eff} effective / {ineff} ineffective</div>
+                                </div>
+                            );
+                        })()}
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-slate-900/50 p-2.5 rounded-lg text-center">
+                                <div className="text-lg font-bold text-blue-400">{player.seasonStats.kicks || 0}</div>
+                                <div className="text-[9px] text-slate-500 uppercase">Kicks</div>
+                            </div>
+                            <div className="bg-slate-900/50 p-2.5 rounded-lg text-center">
+                                <div className="text-lg font-bold text-green-400">{player.seasonStats.handballs || 0}</div>
+                                <div className="text-[9px] text-slate-500 uppercase">Handballs</div>
+                            </div>
+                            <div className="bg-slate-900/50 p-2.5 rounded-lg text-center">
+                                <div className="text-lg font-bold text-purple-400">{player.seasonStats.marks || 0}</div>
+                                <div className="text-[9px] text-slate-500 uppercase">Marks</div>
+                            </div>
+                            <div className="bg-slate-900/50 p-2.5 rounded-lg text-center">
+                                <div className="text-lg font-bold text-orange-400">{player.seasonStats.contendedPossessions || 0}</div>
+                                <div className="text-[9px] text-slate-500 uppercase">Contended</div>
+                            </div>
+                            <div className="bg-slate-900/50 p-2.5 rounded-lg text-center">
+                                <div className="text-lg font-bold text-teal-400">{player.seasonStats.clearances || 0}</div>
+                                <div className="text-[9px] text-slate-500 uppercase">Clearances</div>
+                            </div>
+                            <div className="bg-slate-900/50 p-2.5 rounded-lg text-center">
+                                <div className="text-lg font-bold text-pink-400">{player.seasonStats.inside50s || 0}</div>
+                                <div className="text-[9px] text-slate-500 uppercase">Inside 50</div>
+                            </div>
+                        </div>
+
+                        {/* Brownlow Vote Breakdown */}
+                        {(player.seasonStats.brownlowVotes3 || player.seasonStats.brownlowVotes2 || player.seasonStats.brownlowVotes1) && (
+                            <div className="mt-4 bg-slate-900/50 p-3 rounded-lg">
+                                <div className="text-[10px] text-slate-500 uppercase font-bold mb-2 text-center">Brownlow Votes</div>
+                                <div className="flex justify-center gap-6">
+                                    <div className="text-center">
+                                        <div className="text-xl font-black text-yellow-400">{player.seasonStats.brownlowVotes3 || 0}</div>
+                                        <div className="text-[8px] text-slate-500 uppercase">3pt</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-xl font-black text-blue-400">{player.seasonStats.brownlowVotes2 || 0}</div>
+                                        <div className="text-[8px] text-slate-500 uppercase">2pt</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-xl font-black text-slate-400">{player.seasonStats.brownlowVotes1 || 0}</div>
+                                        <div className="text-[8px] text-slate-500 uppercase">1pt</div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* MILESTONES */}
             <div className="mb-8">
@@ -232,9 +328,61 @@ const PlayerStatsView: React.FC = () => {
                 )}
             </div>
 
+            {/* Career Timeline */}
+            {player.careerHistory && player.careerHistory.length > 0 && (
+                <div className="mb-8">
+                    <CareerTimeline history={player.careerHistory} league={league} />
+                </div>
+            )}
+
+            {/* Career Story — Dynamic Biography */}
+            {((player.biography?.length || 0) > 0 || !!player.bio) && (
+                <div className="mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-black text-white italic uppercase">Career Story</h3>
+                        <button
+                            onClick={() => {
+                                const storyText = (player.biography || (player.bio ? [player.bio] : [])).join('\n\n');
+                                navigator.clipboard.writeText(`🏉 ${player.name} — Career Story\n\n${storyText}`).then(() => {
+                                    setCopiedStory(true);
+                                    setTimeout(() => setCopiedStory(false), 2000);
+                                });
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${
+                                copiedStory
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                        >
+                            {copiedStory ? '✅ Copied!' : '📤 Share Story'}
+                        </button>
+                    </div>
+                    <div className="bg-slate-800 rounded-xl border border-slate-700 p-5">
+                        <div className="space-y-4 font-serif">
+                            {(player.biography || (player.bio ? [player.bio] : [])).map((para, i) => (
+                                <div key={i} className="text-slate-300 text-sm leading-relaxed border-l-2 border-emerald-500/30 pl-4">
+                                    {player.careerHistory && i < player.careerHistory.length && (
+                                        <span className="text-[10px] text-emerald-400 font-sans font-bold uppercase tracking-wider block mb-1">
+                                            Year {player.careerHistory[i]?.year || i + 1}
+                                        </span>
+                                    )}
+                                    <p>{para}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Nickname Selection Modal */}
             {showNicknameModal && (
-                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" style={{ 
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh'
+                }}>
                     <div className="bg-slate-900 rounded-2xl border-2 border-purple-500 shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
                         <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-4 text-center">
                             <h3 className="text-xl font-black text-white uppercase">Choose Your Nickname</h3>

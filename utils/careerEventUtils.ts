@@ -360,3 +360,300 @@ export const formatEffectPreview = (effects: CareerEventEffect): string[] => {
 
   return previews;
 };
+
+// ===== v1.3 NEW EVENT CATEGORIES =====
+
+/**
+ * COMMUNITY events — fan mail, school visits, charity events
+ */
+export const generateCommunityEvent = (player: PlayerProfile, round: number, year: number): CareerEvent | null => {
+  const fanFollowers = player.mediaReputation?.fanFollowers || 0;
+  if (fanFollowers < 1000) return null;
+
+  const roll = Math.random();
+  if (roll < 0.25) {
+    return {
+      id: `community-school-${round}-${year}-${Date.now()}`,
+      type: 'COMMUNITY',
+      category: 'CHOICE',
+      title: 'School Visit Request',
+      description: 'A local school has invited you to speak to students about health and footy. Will you attend?',
+      round,
+      year,
+      icon: '🏫',
+      rarity: 'COMMON',
+      resolved: false,
+      immediateEffects: { energy: -5, morale: 5, fanFollowers: 200 },
+      choices: [
+        { id: 'attend', label: 'Attend', description: 'Spend the afternoon inspiring young fans.', icon: '✅', effects: { morale: 5, fanFollowers: 300, resultText: 'The kids loved it! You signed autographs and answered questions.' }, risk: 'LOW' },
+        { id: 'decline', label: 'Decline', description: 'Focus on training instead.', icon: '❌', effects: { energy: 5, resultText: 'Management appreciates the focus, but some fans are disappointed.' }, risk: 'LOW' },
+      ]
+    };
+  } else if (roll < 0.5) {
+    return {
+      id: `community-charity-${round}-${year}-${Date.now()}`,
+      type: 'COMMUNITY',
+      category: 'CHOICE',
+      title: 'Charity Match Invitation',
+      description: 'A charity organization wants you to participate in a fundraising match. It costs time and money but boosts reputation.',
+      round,
+      year,
+      icon: '💝',
+      rarity: 'UNCOMMON',
+      resolved: false,
+      immediateEffects: { morale: 3 },
+      choices: [
+        { id: 'participate', label: 'Participate', description: 'Spend $2000 and 1 energy for a good cause.', icon: '💰', effects: { wallet: -2000, energy: -5, mediaReputation: 10, fanFollowers: 500, resultText: 'The charity match raised $50,000! You were the star attraction.' }, risk: 'LOW' },
+        { id: 'donate', label: 'Donate Instead', description: 'Contribute $500 without attending.', icon: '🤝', effects: { wallet: -500, mediaReputation: 3, resultText: 'A modest donation. The charity thanks you publicly.' }, risk: 'LOW' },
+        { id: 'decline_c', label: 'Decline', description: 'Not the right time.', icon: '❌', effects: { resultText: 'The charity understands, but some supporters are disappointed.' }, risk: 'MEDIUM' },
+      ]
+    };
+  } else if (roll < 0.75) {
+    return {
+      id: `community-sponsor-${round}-${year}-${Date.now()}`,
+      type: 'COMMUNITY',
+      category: 'CHOICE',
+      title: 'Sponsor Appearance Request',
+      description: 'A major sponsor wants you at a corporate event. Good money, but it takes time away from training.',
+      round,
+      year,
+      icon: '💼',
+      rarity: 'UNCOMMON',
+      resolved: false,
+      immediateEffects: {},
+      choices: [
+        { id: 'attend_s', label: 'Attend', description: 'Earn $3000 but spend 2 energy.', icon: '💵', effects: { wallet: 3000, energy: -5, mediaReputation: -3, resultText: 'The sponsor was thrilled with your professionalism. Coach wasn\'t impressed.' }, risk: 'MEDIUM' },
+        { id: 'delegate_s', label: 'Send Video Message', description: 'A compromise.', icon: '📹', effects: { wallet: 1000, resultText: 'A decent compromise. The sponsor accepts it for now.' }, risk: 'LOW' },
+      ]
+    };
+  } else {
+    return {
+      id: `community-juniors-${round}-${year}-${Date.now()}`,
+      type: 'COMMUNITY',
+      category: 'CHOICE',
+      title: 'Juniors Footy Clinic',
+      description: 'Run a coaching clinic for young players. Low cost, high reward for morale and fans.',
+      round,
+      year,
+      icon: '⚽',
+      rarity: 'COMMON',
+      resolved: false,
+      immediateEffects: { energy: -3 },
+      choices: [
+        { id: 'run_clinic', label: 'Run the Clinic', description: 'Spend 3 energy for a memorable experience.', icon: '🏃', effects: { energy: -3, morale: 10, fanFollowers: 400, legacyImpact: 5, resultText: 'The kids were amazing! You showed them some drills and signed every jumper.' }, risk: 'LOW' },
+        { id: 'skip_clinic', label: 'Skip', description: 'Too busy this week.', icon: '❌', effects: { energy: 3, resultText: 'The club sends an apology. The juniors are disappointed.' }, risk: 'LOW' },
+      ]
+    };
+  }
+};
+
+/**
+ * LOCKER_ROOM events — faction splits, star fallouts, newcomer welcomes
+ */
+export const generateLockerRoomEvent = (player: PlayerProfile, round: number, year: number, teammates: any[]): CareerEvent | null => {
+  const chemistry = player.teamChemistry;
+  if (!chemistry) return null;
+
+  const roll = Math.random();
+
+  if (chemistry.overallChemistry < 40 && roll < 0.3) {
+    return {
+      id: `locker-faction-${round}-${year}-${Date.now()}`,
+      type: 'LOCKER_ROOM',
+      category: 'CHOICE',
+      title: 'Faction Split',
+      description: 'Two groups are forming in the locker room. Veterans vs new recruits. You\'re caught in the middle.',
+      round,
+      year,
+      icon: '💔',
+      rarity: 'RARE',
+      resolved: false,
+      immediateEffects: { morale: -10 },
+      choices: [
+        { id: 'mediate', label: 'Mediate', description: 'Try to bring both sides together.', icon: '🤝', effects: { morale: 10, resultText: 'Your mediation skills impressed everyone. The room feels more united.' }, risk: 'MEDIUM' },
+        { id: 'take_side', label: 'Take a Side', description: 'Side with the veterans who\'ve been loyal.', icon: '👥', effects: { morale: -5, resultText: 'You backed the veterans. The new boys aren\'t happy.' }, risk: 'HIGH' },
+      ]
+    };
+  }
+
+  if (roll < 0.25) {
+    return {
+      id: `locker-newcomer-${round}-${year}-${Date.now()}`,
+      type: 'LOCKER_ROOM',
+      category: 'CHOICE',
+      title: 'Newcomer Welcome',
+      description: 'A highly-touted draftee has joined the club. How do you welcome them?',
+      round,
+      year,
+      icon: '🌟',
+      rarity: 'COMMON',
+      resolved: false,
+      immediateEffects: {},
+      choices: [
+        { id: 'mentor', label: 'Take Them Under Your Wing', description: 'Become their unofficial mentor.', icon: '👑', effects: { morale: 5, resultText: 'The kid looks up to you now. They\'re working hard to follow your example.' }, risk: 'LOW' },
+        { id: 'challenge', label: 'Challenge Them', description: 'Push them to earn their spot.', icon: '💪', effects: { resultText: 'Tough love. The kid might struggle but they\'ll grow from it.' }, risk: 'MEDIUM' },
+        { id: 'ignore_n', label: 'Leave Them Alone', description: 'Let them find their own way.', icon: '👋', effects: { resultText: 'They\'ll figure it out. Some players thrive on their own.' }, risk: 'LOW' },
+      ]
+    };
+  }
+
+  if (roll < 0.45) {
+    return {
+      id: `locker-celebration-${round}-${year}-${Date.now()}`,
+      type: 'LOCKER_ROOM',
+      category: 'POSITIVE',
+      title: 'Celebration Moment',
+      description: 'After a huge win, the locker room is buzzing. Everyone\'s in great spirits.',
+      round,
+      year,
+      icon: '🎉',
+      rarity: 'COMMON',
+      resolved: false,
+      immediateEffects: { morale: 10 }
+    };
+  }
+
+  return null;
+};
+
+/**
+ * LEGACY_MOMENT events — match milestones, premierships, awards
+ */
+export const generateLegacyMoment = (player: PlayerProfile, round: number, year: number): CareerEvent | null => {
+  const matches = player.careerStats?.matches || 0;
+  const premierships = player.careerStats?.premierships || 0;
+
+  if (matches === 100) {
+    return {
+      id: `legacy-100-${round}-${year}-${Date.now()}`,
+      type: 'LEGACY_MOMENT',
+      category: 'POSITIVE',
+      title: 'A Century of Service',
+      description: '100 games. The club has organized a ceremony. Former teammates, coaches, and fans are all here to celebrate.',
+      round,
+      year,
+      icon: '💯',
+      rarity: 'LEGENDARY',
+      resolved: false,
+      immediateEffects: { morale: 20, fanFollowers: 1000, legacyImpact: 15 }
+    };
+  }
+
+  if (matches === 200) {
+    return {
+      id: `legacy-200-${round}-${year}-${Date.now()}`,
+      type: 'LEGACY_MOMENT',
+      category: 'POSITIVE',
+      title: 'Two Hundred Reasons',
+      description: 'A career-defining milestone. Full tribute round. Media coverage guaranteed. Your place in club history is secure.',
+      round,
+      year,
+      icon: '🏟️',
+      rarity: 'LEGENDARY',
+      resolved: false,
+      immediateEffects: { morale: 30, fanFollowers: 2000, legacyImpact: 30, mediaReputation: 15 }
+    };
+  }
+
+  if (premierships === 1 && !player.seasonStats?.awards?.includes('First Premiership')) {
+    return {
+      id: `legacy-premiership-${round}-${year}-${Date.now()}`,
+      type: 'LEGACY_MOMENT',
+      category: 'CHOICE',
+      title: 'The Flag',
+      description: 'You\'ve won your first premiership. The更衣室 is electric. How do you handle the moment?',
+      round,
+      year,
+      icon: '🏆',
+      rarity: 'LEGENDARY',
+      resolved: false,
+      immediateEffects: { morale: 30 },
+      choices: [
+        { id: 'celebrate_quietly', label: 'Celebrate Quietly', description: 'Let the moment sink in. Hug your teammates.', icon: '🤗', effects: { morale: 10, legacyImpact: 10, resultText: 'A quiet moment of pure joy. You\'ll carry this forever.' }, risk: 'LOW' },
+        { id: 'celebrate_publicly', label: 'Go Big', description: 'Grab the mic. Tell the crowd what it means.', icon: '🎤', effects: { fanFollowers: 2000, legacyImpact: 15, mediaReputation: 5, resultText: 'Your speech went viral. The club loves it.' }, risk: 'LOW' },
+      ]
+    };
+  }
+
+  return null;
+};
+
+/**
+ * FAN MAIL system — fires every 2-3 rounds once fans > 1000
+ */
+export const generateFanMail = (player: PlayerProfile, round: number, year: number): CareerEvent | null => {
+  const fanFollowers = player.mediaReputation?.fanFollowers || 0;
+  if (fanFollowers < 1000) return null;
+  if (round % 3 !== 0) return null; // Every 3 rounds
+
+  const types = ['ENCOURAGEMENT', 'CRITICISM', 'CHALLENGE', 'HEARTFELT', 'FUNNY', 'WEIRD'] as const;
+  const type = types[Math.floor(Math.random() * types.length)];
+
+  const messages: Record<string, string[]> = {
+    ENCOURAGEMENT: ['Keep going! You\'re my hero!', 'Watching you play makes my day!', 'Best player in the league!'],
+    CRITICISM: ['You\'re overpaid and underperforming.', 'My 8-year-old could do better.', 'The media is too soft on you.'],
+    CHALLENGE: ['Bet you can\'t kick 5 this week!', 'I\'ll donate $100 if you lay 8 tackles.', 'Prove the critics wrong!'],
+    HEARTFELT: ['Your story inspires my recovery. Thank you.', 'I named my son after you. No pressure.', 'You helped me through a tough time.'],
+    FUNNY: ['If you were a sausage, you\'d be a footy sausage.', 'My dog plays better defense. Love ya!', 'Are you a magician? Because every game you magic the crowd!'],
+    WEIRD: ['Please marry my sister. She has your poster on the wall.', 'I dreamt you scored 10 goals last night. Make it real!', 'Can you send me your boots? I\'ll pay in kangaroo meat.'],
+  };
+
+  const msgList = messages[type] || messages.ENCOURAGEMENT;
+  const message = msgList[Math.floor(Math.random() * msgList.length)];
+
+  return {
+    id: `fanmail-${round}-${year}-${Date.now()}`,
+    type: 'FAN_MAIL',
+    category: 'CHOICE',
+    title: `Fan Mail: ${type}`,
+    description: message,
+    round,
+    year,
+    icon: type === 'HEARTFELT' ? '💌' : type === 'CRITICISM' ? '😤' : type === 'FUNNY' ? '😂' : '📬',
+    rarity: type === 'HEARTFELT' ? 'RARE' : 'COMMON',
+    resolved: false,
+    choices: [
+      { id: 'reply_kindly', label: 'Reply Kindly', description: 'Take the time to respond personally.', icon: '💬', effects: { fanFollowers: 100, morale: 3, resultText: 'The fan was thrilled to hear from you!' }, risk: 'LOW' },
+      { id: 'share_publicly', label: 'Share Publicly', description: 'Post it on social media for your fans.', icon: '📱', effects: { fanFollowers: 300, mediaReputation: -2, resultText: 'The post went viral. Great engagement!' }, risk: 'MEDIUM' },
+      { id: 'ignore_f', label: 'Ignore', description: 'Can\'t respond to every message.', icon: '🤷', effects: { resultText: 'You moved on. Some fans understand, others don\'t.' }, risk: 'LOW' },
+    ]
+  };
+};
+
+/**
+ * Generate season biography paragraph for the player
+ */
+export const generateSeasonBioParagraph = (
+  player: PlayerProfile,
+  seasonHistory: any,
+  year: number
+): string => {
+  const stats = seasonHistory?.stats || player.seasonStats;
+  const matches = stats?.matches || 0;
+  const goals = stats?.goals || 0;
+  const disposals = stats?.disposals || 0;
+
+  const avgDisposals = matches > 0 ? (disposals / matches).toFixed(1) : '0';
+  const tier = player.contract?.tier || 'Unknown';
+
+  // Template-based generation (Gemini fallback would be handled in UI layer)
+  let paragraph = `In season ${year}, ${player.name} played ${matches} games for ${player.contract?.clubName || 'the club'} in the ${tier}. `;
+
+  if (goals > 10) {
+    paragraph += `A productive year in front of goal with ${goals} majors. `;
+  }
+  if (avgDisposals && parseFloat(avgDisposals) > 20) {
+    paragraph += `Consistently influential with an average of ${avgDisposals} disposals per game. `;
+  }
+  if (seasonHistory?.promoted) {
+    paragraph += 'The highlight was earning promotion to a higher league. ';
+  }
+  if (seasonHistory?.premiership) {
+    paragraph += 'Capped off a fairy-tale season with a premiership. ';
+  }
+  if (seasonHistory?.relegated) {
+    paragraph += 'A challenging year that ended in relegation. ';
+  }
+
+  return paragraph;
+};

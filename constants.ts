@@ -72,23 +72,48 @@ export const POSITIONS = [
 ];
 
 // Hybrid System Configuration
-export const PRESET_AVATARS: AvatarConfig[] = [
-  { faceId: "Liam" },    
-  { faceId: "Nolan" },   
-  { faceId: "Felix" },   
-  { faceId: "Jack" },    
-  { faceId: "Aneka" },   
-  { faceId: "Leo" },     
-  { faceId: "Max" },     
-  { faceId: "Christopher" }, 
-  { faceId: "Caleb" },   
-  { faceId: "Aiden" },   
-  { faceId: "Easton" },  
-  { faceId: "Wyatt" },   
+// Male avatars - more cartoonish AFL player style
+export const MALE_AVATARS: AvatarConfig[] = [
+  { faceId: "afl-player-1", style: "cartoon" },    
+  { faceId: "afl-player-2", style: "cartoon" },   
+  { faceId: "afl-player-3", style: "cartoon" },   
+  { faceId: "afl-player-4", style: "cartoon" },    
+  { faceId: "afl-player-5", style: "cartoon" },   
+  { faceId: "afl-player-6", style: "cartoon" },     
+  { faceId: "afl-player-7", style: "cartoon" },     
+  { faceId: "afl-player-8", style: "cartoon" }, 
+  { faceId: "afl-player-9", style: "cartoon" },   
+  { faceId: "afl-player-10", style: "cartoon" },   
+  { faceId: "afl-player-11", style: "cartoon" },  
+  { faceId: "afl-player-12", style: "cartoon" },   
 ];
 
-// Helper to construct the URL
-export const getFaceUrl = (faceId: string) => {
+// Female avatars - cartoonish AFLW player style
+export const FEMALE_AVATARS: AvatarConfig[] = [
+  { faceId: "aflw-player-1", style: "cartoon" },    
+  { faceId: "aflw-player-2", style: "cartoon" },   
+  { faceId: "aflw-player-3", style: "cartoon" },   
+  { faceId: "aflw-player-4", style: "cartoon" },    
+  { faceId: "aflw-player-5", style: "cartoon" },   
+  { faceId: "aflw-player-6", style: "cartoon" },     
+  { faceId: "aflw-player-7", style: "cartoon" },     
+  { faceId: "aflw-player-8", style: "cartoon" }, 
+  { faceId: "aflw-player-9", style: "cartoon" },   
+  { faceId: "aflw-player-10", style: "cartoon" },   
+  { faceId: "aflw-player-11", style: "cartoon" },  
+  { faceId: "aflw-player-12", style: "cartoon" },   
+];
+
+// Default to male avatars for backward compatibility
+export const PRESET_AVATARS: AvatarConfig[] = MALE_AVATARS;
+
+// Helper to construct the URL for cartoonish AFL avatars
+export const getFaceUrl = (faceId: string, style: string = "cartoon") => {
+    if (style === "cartoon") {
+        // Use a more cartoonish avatar style
+        return `https://api.dicebear.com/9.x/personas/svg?seed=${faceId}&radius=50&backgroundColor=transparent&mood[]=happy&mood[]=excited`;
+    }
+    // Fallback to original style
     return `https://api.dicebear.com/9.x/micah/svg?seed=${faceId}&radius=50&backgroundColor=transparent`;
 }
 
@@ -1410,4 +1435,314 @@ export const MASTER_SKILLS: MasterSkill[] = [
     effectValue: 1.6, // 60% goal sense boost
     rarity: 'LEGENDARY'
   }
+];// ============================================================
+// v1.3 CONSTANTS — Appended to constants.ts
+// ============================================================
+
+import { StoryArcType, CultureType, Milestone } from './types';
+
+// ===== STORY ARC TEMPLATES =====
+
+export interface StoryArcTemplate {
+  type: StoryArcType;
+  title: string;
+  synopsis: string;
+  triggerCondition: (player: any) => boolean;
+  acts: {
+    setup: { title: string; description: string; icon: string };
+    escalation: { title: string; description: string; icon: string };
+    resolution: { title: string; description: string; icon: string; choices: { id: string; label: string; description: string; icon: string; narrativeTag: string; reputationChange: number; fanChange: number; walletChange: number; moraleChange: number; legacyChange: number }[] };
+  };
+}
+
+export const STORY_ARC_TEMPLATES: StoryArcTemplate[] = [
+  {
+    type: 'CONTRACT_SAGA',
+    title: 'Contract Standoff',
+    synopsis: 'Your contract is expiring and the club\'s offer falls short. Will you fight, negotiate, or walk away?',
+    triggerCondition: (p) => p.contract?.yearsLeft <= 1,
+    acts: {
+      setup: { title: 'The Lowball Offer', description: 'Management presents a contract below your expectations. The media picks up the story.', icon: '📋' },
+      escalation: { title: 'Public Tension', description: 'Your agent goes public. The club pushes back. Fans are divided.', icon: '🔥' },
+      resolution: {
+        title: 'The Decision',
+        description: 'Time to choose: sign the deal, hold out, or go public with your demands.',
+        icon: '⚖️',
+        choices: [
+          { id: 'accept', label: 'Sign the Deal', description: 'Take what\'s offered and move on.', icon: '✍️', narrativeTag: 'team_player', reputationChange: -5, fanChange: -200, walletChange: 0, moraleChange: -10, legacyChange: -5 },
+          { id: 'hold_out', label: 'Hold Out', description: 'Refuse to train until terms improve.', icon: '🚫', narrativeTag: 'hard_bargainer', reputationChange: -10, fanChange: -500, walletChange: 5000, moraleChange: 5, legacyChange: -10 },
+          { id: 'go_public', label: 'Go Public', description: 'Take your case to the media.', icon: '📢', narrativeTag: 'media_savvy', reputationChange: 5, fanChange: 300, walletChange: 2000, moraleChange: 0, legacyChange: 0 },
+        ]
+      }
+    }
+  },
+  {
+    type: 'RIVALRY_ESCALATION',
+    title: 'Bad Blood',
+    synopsis: 'A rivalry has reached boiling point. The next encounter will define your relationship.',
+    triggerCondition: (p) => (p.rivalries || []).some((r: any) => r.intensity === 'High' && !r.resolved),
+    acts: {
+      setup: { title: 'Tension Builds', description: 'The media keeps bringing up the rivalry. Your opponent talks trash in interviews.', icon: '💢' },
+      escalation: { title: 'Confrontation', description: 'A heated on-field clash. Both teams get involved. The umpires struggle to keep control.', icon: '😤' },
+      resolution: {
+        title: 'Final Word',
+        description: 'One last moment to settle this — or let it burn into a career-long feud.',
+        icon: '⚔️',
+        choices: [
+          { id: 'shake_hands', label: 'Shake Hands', description: 'Rise above it. End the rivalry with class.', icon: '🤝', narrativeTag: 'class_act', reputationChange: 10, fanChange: 200, walletChange: 0, moraleChange: 5, legacyChange: 5 },
+          { id: 'escalate', label: 'Keep Fighting', description: 'Let the rivalry define both of you.', icon: '🔥', narrativeTag: 'feud_continues', reputationChange: -5, fanChange: 500, walletChange: 0, moraleChange: -5, legacyChange: -5 },
+        ]
+      }
+    }
+  },
+  {
+    type: 'CAPTAINCY_JOURNEY',
+    title: 'The Armband',
+    synopsis: 'You\'ve been named captain. Now prove you can lead.',
+    triggerCondition: (p) => p.isCaptain && !p.activeStoryArcs?.some((a: any) => a.type === 'CAPTAINCY_JOURNEY'),
+    acts: {
+      setup: { title: 'Earning Trust', description: 'The coach names you captain. Teammates look to you for direction.', icon: '👑' },
+      escalation: { title: 'Leadership Tested', description: 'The team hits a losing streak. Questions are asked about your leadership.', icon: '💪' },
+      resolution: {
+        title: 'Captain\'s Legacy',
+        description: 'How will you respond to the pressure?',
+        icon: '🏆',
+        choices: [
+          { id: 'lead_by_example', label: 'Lead by Example', description: 'Put in extra training. Speak up in the rooms.', icon: '🎯', narrativeTag: 'lead_by_example', reputationChange: 5, fanChange: 100, walletChange: 0, moraleChange: 10, legacyChange: 10 },
+          { id: 'delegate', label: 'Empower Veterans', description: 'Trust the senior players to guide the group.', icon: '🤝', narrativeTag: 'delegator', reputationChange: 0, fanChange: 0, walletChange: 0, moraleChange: 5, legacyChange: 5 },
+        ]
+      }
+    }
+  },
+  {
+    type: 'REDEMPTION_ARC',
+    title: 'Road to Redemption',
+    synopsis: 'After a disappointing season, it\'s time to prove the critics wrong.',
+    triggerCondition: (p) => (p.seasonStats?.matches || 0) > 0 && (p.seasonStats.disposals / Math.max(1, p.seasonStats.matches)) < 12,
+    acts: {
+      setup: { title: 'The Fallout', description: 'Media questions your future. The coach calls a private meeting.', icon: '📉' },
+      escalation: { title: 'Hard Yards', description: 'Extra sessions at the training ground. You\'re putting in the work.', icon: '🏋️' },
+      resolution: {
+        title: 'The Comeback',
+        description: 'A strong performance. Now how do you handle the attention?',
+        icon: '🌟',
+        choices: [
+          { id: 'humble', label: 'Stay Humble', description: 'Credit the coaches and teammates.', icon: '🙏', narrativeTag: 'humble_return', reputationChange: 10, fanChange: 200, walletChange: 0, moraleChange: 10, legacyChange: 5 },
+          { id: 'confident', label: 'Confident Response', description: '"I told you I\'d be back."', icon: '😎', narrativeTag: 'confident_comeback', reputationChange: 5, fanChange: 400, walletChange: 0, moraleChange: 5, legacyChange: 0 },
+        ]
+      }
+    }
+  },
+  {
+    type: 'MEDIA_FIRESTORM',
+    title: 'Media Firestorm',
+    synopsis: 'A controversial moment has exploded in the press. Handle it before it defines your season.',
+    triggerCondition: (p) => (p.mediaReputation?.score || 50) < 35,
+    acts: {
+      setup: { title: 'The Spark', description: 'A comment, an incident, a leaked photo — the media pounces.', icon: '📰' },
+      escalation: { title: 'The Pile-On', description: 'Talkback radio, social media trolls, former players weigh in.', icon: '🔊' },
+      resolution: {
+        title: 'Face the Music',
+        description: 'Time for a press conference. What\'s your approach?',
+        icon: '🎤',
+        choices: [
+          { id: 'apologise', label: 'Apologise', description: 'Own it. Move on. Take the hit.', icon: '😔', narrativeTag: 'owns_mistake', reputationChange: 15, fanChange: 100, walletChange: 0, moraleChange: -5, legacyChange: 0 },
+          { id: 'deflect', label: 'Deflect', description: 'Shift the narrative. Blame the context.', icon: '🔄', narrativeTag: 'deflects', reputationChange: -5, fanChange: -100, walletChange: 0, moraleChange: 5, legacyChange: -5 },
+          { id: 'ignore', label: 'Say Nothing', description: 'Let it blow over. Focus on footy.', icon: '🤐', narrativeTag: 'silent_treatment', reputationChange: -10, fanChange: -200, walletChange: 0, moraleChange: -10, legacyChange: -5 },
+        ]
+      }
+    }
+  },
+  {
+    type: 'MENTOR_RELATIONSHIP',
+    title: 'The Mentor',
+    synopsis: 'A veteran at the club takes you under their wing. What do you learn?',
+    triggerCondition: (p) => (p.age || 18) <= 22 && (p.seasonsPlayed || 0) < 2,
+    acts: {
+      setup: { title: 'The Invitation', description: 'A senior player invites you to stay back after training for extra work.', icon: '🤝' },
+      escalation: { title: 'Lessons Learned', description: 'They share insights about preparation, recovery, and reading the game.', icon: '📖' },
+      resolution: {
+        title: 'Passing the Torch',
+        description: 'Your mentor announces retirement. How do you honour their legacy?',
+        icon: '🏅',
+        choices: [
+          { id: 'tribute', label: 'Public Tribute', description: 'Speak about them at the press conference.', icon: '🎤', narrativeTag: 'honours_mentors', reputationChange: 5, fanChange: 100, walletChange: 0, moraleChange: 5, legacyChange: 5 },
+          { id: 'quiet_respect', label: 'Quiet Respect', description: 'Let your performances do the talking.', icon: '💪', narrativeTag: 'quiet_respect', reputationChange: 0, fanChange: 0, walletChange: 0, moraleChange: 10, legacyChange: 5 },
+        ]
+      }
+    }
+  },
+  {
+    type: 'SLUMP_AND_RETURN',
+    title: 'The Slump',
+    synopsis: 'Form has deserted you. Every week feels like a grind. Can you find your way back?',
+    triggerCondition: (p) => (p.voteStreak || 0) === 0 && (p.seasonStats?.matches || 0) > 3,
+    acts: {
+      setup: { title: 'Drought Sets In', description: 'Three weeks without a vote. The selection table looms large.', icon: '🏜️' },
+      escalation: { title: 'The Bench Threat', description: 'Coaches consider dropping you to reserves.', icon: '⚠️' },
+      resolution: {
+        title: 'Turning Point',
+        description: 'A chance to break the drought. How do you seize it?',
+        icon: '💫',
+        choices: [
+          { id: 'simplify', label: 'Simplify the Game', description: 'Back to basics. One percenters. Team first.', icon: '🎯', narrativeTag: 'back_to_basics', reputationChange: 5, fanChange: 100, walletChange: 0, moraleChange: 15, legacyChange: 5 },
+          { id: 'press_on', label: 'Play Your Game', description: 'Trust your natural instincts and skills.', icon: '🔥', narrativeTag: 'trusts_instinct', reputationChange: 0, fanChange: 200, walletChange: 0, moraleChange: 10, legacyChange: 0 },
+        ]
+      }
+    }
+  },
+  {
+    type: 'TRADE_SPECULATION',
+    title: 'Trade Whirlwind',
+    synopsis: 'Your name is everywhere. Clubs are calling. What\'s your future?',
+    triggerCondition: (p) => (p.transferOffers?.length || 0) > 0 && !p.activeStoryArcs?.some((a: any) => a.type === 'TRADE_SPECULATION'),
+    acts: {
+      setup: { title: 'Rumours Swirl', description: 'Journalists link you with three clubs. Your phone won\'t stop ringing.', icon: '📞' },
+      escalation: { title: 'The Squeeze', description: 'Your current club pushes for a decision. Interested clubs make their move.', icon: '⏰' },
+      resolution: {
+        title: 'The Decision',
+        description: 'Time to commit. Stay or go?',
+        icon: '🏠',
+        choices: [
+          { id: 'stay', label: 'Re-sign', description: 'Commit to your current club.', icon: '✍️', narrativeTag: 'loyalist', reputationChange: 5, fanChange: 300, walletChange: 3000, moraleChange: 5, legacyChange: 5 },
+          { id: 'explore', label: 'Test the Market', description: 'Hear out all offers before deciding.', icon: '🔍', narrativeTag: 'explorer', reputationChange: -5, fanChange: -100, walletChange: 8000, moraleChange: 0, legacyChange: 0 },
+        ]
+      }
+    }
+  },
+  {
+    type: 'LEGACY_CHASE',
+    title: 'Chasing Immortality',
+    synopsis: 'You\'re close to club legend status. Every game matters now.',
+    triggerCondition: (p) => (p.legacyScore || 0) >= 550 && (p.legacyScore || 0) < 650,
+    acts: {
+      setup: { title: 'So Close', description: 'Former greats compare you to the club\'s all-time legends.', icon: '🏛️' },
+      escalation: { title: 'The Push', description: 'A run of big games. Everything is on the line.', icon: '📈' },
+      resolution: {
+        title: 'Immortalised',
+        description: 'The moment that defines your legacy.',
+        icon: '⭐',
+        choices: [
+          { id: 'embrace', label: 'Embrace the Moment', description: 'Play with freedom and joy.', icon: '🎉', narrativeTag: 'moment_taker', reputationChange: 10, fanChange: 500, walletChange: 0, moraleChange: 10, legacyChange: 20 },
+          { id: 'pressure', label: 'Feel the Weight', description: 'The expectation gets to you.', icon: '😰', narrativeTag: 'pressure_cracks', reputationChange: -5, fanChange: -100, walletChange: 0, moraleChange: -10, legacyChange: -10 },
+        ]
+      }
+    }
+  },
+  {
+    type: 'FAREWELL_SEASON',
+    title: 'One Last Dance',
+    synopsis: 'This is it. The final season. Make every moment count.',
+    triggerCondition: (p) => (p.age || 18) >= 33 || p.farewell,
+    acts: {
+      setup: { title: 'The Announcement', description: 'You\'ve told the club this is your last year. The news spreads.', icon: '🎤' },
+      escalation: { title: 'The Tributes', description: 'Opposing players shake your hand before the bounce. Former teammates send messages.', icon: '🫡' },
+      resolution: {
+        title: 'The Final Siren',
+        description: 'Your last game. How do you want to be remembered?',
+        icon: '🏟️',
+        choices: [
+          { id: 'celebrate', label: 'Celebrate Everything', description: 'Take a lap. Soak it in.', icon: '🎊', narrativeTag: 'grateful_farewell', reputationChange: 15, fanChange: 1000, walletChange: 0, moraleChange: 20, legacyChange: 25 },
+          { id: 'quiet_exit', label: 'Quiet Exit', description: 'No fuss. Just footy.', icon: '🤫', narrativeTag: 'quiet_professional', reputationChange: 5, fanChange: 200, walletChange: 0, moraleChange: 10, legacyChange: 15 },
+        ]
+      }
+    }
+  },
+];
+
+// ===== CULTURE EFFECTS =====
+
+export interface CultureEffect {
+  passiveMatchPressure: number;
+  xpBonus: number;
+  fanBonusPerRound: number;
+  upsetBonus: number;
+  uniqueEvents: string[];
+}
+
+export const CULTURE_EFFECTS: Record<CultureType, CultureEffect> = {
+  PREMIERSHIP_HUNGRY: {
+    passiveMatchPressure: 5,
+    xpBonus: 0,
+    fanBonusPerRound: 0,
+    upsetBonus: 0,
+    uniqueEvents: ['Club demands finals run', 'Captain\'s speech before elimination final', 'Management frustration after regular season loss'],
+  },
+  REBUILDING: {
+    passiveMatchPressure: 0,
+    xpBonus: 10,
+    fanBonusPerRound: 0,
+    upsetBonus: 0,
+    uniqueEvents: ['You\'re the future — leadership offered early', 'Club sells experienced teammate (morale hit)', 'Media questions rebuild timeline'],
+  },
+  STORIED_CLUB: {
+    passiveMatchPressure: 0,
+    xpBonus: 0,
+    fanBonusPerRound: 5,
+    upsetBonus: 0,
+    uniqueEvents: ['Former legend visits training', 'Anniversary of famous premiership (legacy moment)', 'Media compares you to club great'],
+  },
+  UNDERDOG: {
+    passiveMatchPressure: 0,
+    xpBonus: 0,
+    fanBonusPerRound: 0,
+    upsetBonus: 8,
+    uniqueEvents: ['No one believes in us — team bond event', 'Shock win generates media storm', 'Low budget forces creative contract negotiation'],
+  },
+  BIG_CITY: {
+    passiveMatchPressure: 0,
+    xpBonus: 0,
+    fanBonusPerRound: 500,
+    upsetBonus: 0,
+    uniqueEvents: ['Paparazzi spotted at training', 'Sponsorship offers flood in after good run', 'Tabloid runs negative story (reputation risk)'],
+  },
+};
+
+// ===== LEGACY TIERS =====
+
+export interface LegacyTier {
+  minScore: number;
+  maxScore: number;
+  title: string;
+  unlocks: string[];
+}
+
+export const LEGACY_TIERS: LegacyTier[] = [
+  { minScore: 0, maxScore: 99, title: 'Journeyman', unlocks: ['Career started. No special unlock.'] },
+  { minScore: 100, maxScore: 249, title: 'Promising Talent', unlocks: ['Nickname generation pool expands.', 'Club offers improved contract role.'] },
+  { minScore: 250, maxScore: 449, title: 'Club Stalwart', unlocks: ['Jersey retirement consideration event (200+ matches).', 'Fan milestone triggered.'] },
+  { minScore: 450, maxScore: 649, title: 'Fan Favourite', unlocks: ['All-Australian consideration regardless of stats.', 'Media always friendly.'] },
+  { minScore: 650, maxScore: 849, title: 'Club Legend', unlocks: ['Club history record eligible.', 'Hall of Fame path opens.', 'LEGACY_CHASE arc fires.'] },
+  { minScore: 850, maxScore: 9999, title: 'AFL Icon', unlocks: ['Post-career path unlocks (MEDIA, AMBASSADOR, COACHING).', 'Farewell tribute event.'] },
+];
+
+// ===== EXTENDED MILESTONE DEFINITIONS =====
+
+export const MILESTONE_DEFINITIONS: Omit<Milestone, 'achievedRound' | 'achievedYear'>[] = [
+  // Votes
+  { type: 'VOTES', value: 50, description: '50 Career Brownlow Votes' },
+  { type: 'VOTES', value: 100, description: '100 Career Brownlow Votes' },
+  { type: 'VOTES', value: 200, description: '200 Career Brownlow Votes' },
+  { type: 'VOTES', value: 300, description: '300 Career Brownlow Votes' },
+  // Awards
+  { type: 'AWARDS', value: 1, description: 'First Career Award' },
+  { type: 'AWARDS', value: 3, description: '3 Career Awards' },
+  { type: 'AWARDS', value: 5, description: '5 Career Awards' },
+  { type: 'AWARDS', value: 10, description: '10 Career Awards' },
+  // Seasons
+  { type: 'SEASONS', value: 5, description: '5 Seasons Played' },
+  { type: 'SEASONS', value: 10, description: '10 Seasons Played' },
+  { type: 'SEASONS', value: 15, description: '15 Seasons Played' },
+  // Chemistry
+  { type: 'CHEMISTRY', value: 3, description: 'BEST_MATE Status with 3 Teammates' },
+  // Legacy
+  { type: 'LEGACY', value: 100, description: 'Promising Talent Legacy Tier' },
+  { type: 'LEGACY', value: 250, description: 'Club Stalwart Legacy Tier' },
+  { type: 'LEGACY', value: 450, description: 'Fan Favourite Legacy Tier' },
+  { type: 'LEGACY', value: 650, description: 'Club Legend Legacy Tier' },
+  { type: 'LEGACY', value: 850, description: 'AFL Icon Legacy Tier' },
+  // Narrative
+  { type: 'NARRATIVE', value: 1, description: 'Complete First Story Arc' },
+  { type: 'NARRATIVE', value: 5, description: 'Complete 5 Story Arcs' },
+  { type: 'NARRATIVE', value: 10, description: 'Complete 10 Story Arcs' },
 ];

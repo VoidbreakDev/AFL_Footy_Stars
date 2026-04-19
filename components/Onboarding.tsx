@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { Position, LeagueTier, PlayerProfile, AvatarConfig, LeagueGender } from '../types';
-import { INITIAL_ATTRIBUTE_POINTS, PRESET_AVATARS, STARTING_AGE } from '../constants';
+import { INITIAL_ATTRIBUTE_POINTS, PRESET_AVATARS, MALE_AVATARS, FEMALE_AVATARS, STARTING_AGE } from '../constants';
 import Avatar from './Avatar';
 
 const Onboarding: React.FC = () => {
@@ -11,9 +11,11 @@ const Onboarding: React.FC = () => {
   
   const [name, setName] = useState('');
   const [position, setPosition] = useState<Position>(Position.MIDFIELDER);
-  const [selectedAvatar, setSelectedAvatar] = useState<AvatarConfig>(PRESET_AVATARS[0]);
+  const [selectedAvatar, setSelectedAvatar] = useState<AvatarConfig>(MALE_AVATARS[0]);
   const [jerseyNumber, setJerseyNumber] = useState(7); // Lucky number 7 as default
   const [leagueGender, setLeagueGender] = useState<LeagueGender>('MENS');
+  const [availableAvatars, setAvailableAvatars] = useState<AvatarConfig[]>(MALE_AVATARS);
+  const [shuffledNumbers, setShuffledNumbers] = useState<number[]>([1, 3, 7, 13, 23, 42, 69, 99]);
   
   const [attributes, setAttributes] = useState({
     kicking: 10,
@@ -27,6 +29,38 @@ const Onboarding: React.FC = () => {
   
   const [remainingPoints, setRemainingPoints] = useState(INITIAL_ATTRIBUTE_POINTS);
   const ATTRIBUTE_CAP = 20;
+
+  // Shuffle jersey numbers on component mount
+  useEffect(() => {
+    const shuffleNumbers = () => {
+      const numbers = [1, 3, 7, 13, 23, 42, 69, 99];
+      // Fisher-Yates shuffle algorithm
+      for (let i = numbers.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+      }
+      setShuffledNumbers(numbers);
+    };
+    
+    shuffleNumbers();
+  }, []);
+
+  // Handle league gender change - switch avatar sets
+  useEffect(() => {
+    if (leagueGender === 'MENS') {
+      setAvailableAvatars(MALE_AVATARS);
+      // Reset to first male avatar if current selection is not in male set
+      if (!MALE_AVATARS.some(avatar => avatar.faceId === selectedAvatar.faceId)) {
+        setSelectedAvatar(MALE_AVATARS[0]);
+      }
+    } else {
+      setAvailableAvatars(FEMALE_AVATARS);
+      // Reset to first female avatar if current selection is not in female set
+      if (!FEMALE_AVATARS.some(avatar => avatar.faceId === selectedAvatar.faceId)) {
+        setSelectedAvatar(FEMALE_AVATARS[0]);
+      }
+    }
+  }, [leagueGender, selectedAvatar.faceId]);
 
   const handleAttributeChange = (attr: keyof typeof attributes, change: number) => {
     if (change > 0 && remainingPoints > 0 && attributes[attr] < ATTRIBUTE_CAP) {
@@ -77,14 +111,19 @@ const Onboarding: React.FC = () => {
   };
 
   return (
-    <div className="h-screen bg-slate-900 flex flex-col text-white overflow-hidden">
+    <div className="h-full bg-slate-900 flex flex-col text-white overflow-hidden" style={{ 
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)'
+    }}>
       <div className="p-4 pb-0 text-center shrink-0">
            <h1 className="text-3xl font-black text-emerald-400 uppercase italic tracking-wider">Create Legend</h1>
       </div>
       
-      <div className="flex-1 p-4 flex flex-col overflow-hidden">
+      <div className="flex-1 p-4 flex flex-col overflow-y-auto scroll-smooth">
         {step === 1 ? (
-            <div className="flex flex-col h-full gap-3">
+            <div className="flex flex-col gap-3 pb-20">
                 {/* Name */}
                 <div className="shrink-0">
                     <label className="block text-[10px] text-slate-400 mb-1 uppercase font-bold">Name</label>
@@ -101,7 +140,7 @@ const Onboarding: React.FC = () => {
                 <div className="flex-1 min-h-0 flex flex-col">
                     <label className="block text-[10px] text-slate-400 mb-1 uppercase font-bold">Select Look</label>
                     <div className="grid grid-cols-4 gap-2 overflow-y-auto pr-1 scrollbar-hide content-start">
-                        {PRESET_AVATARS.map((avatar, i) => (
+                        {availableAvatars.map((avatar, i) => (
                         <div 
                             key={i}
                             onClick={() => setSelectedAvatar(avatar)}
@@ -167,7 +206,7 @@ const Onboarding: React.FC = () => {
                         </button>
                     </div>
                     <div className="mt-1 flex gap-1 flex-wrap">
-                        {[1, 3, 7, 13, 23, 42, 69, 99].map(num => (
+                        {shuffledNumbers.map(num => (
                             <button
                                 key={num}
                                 onClick={() => setJerseyNumber(num)}
@@ -188,7 +227,7 @@ const Onboarding: React.FC = () => {
                 </button>
             </div>
         ) : (
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col pb-20">
                  {/* Header Summary */}
                  <div className="flex items-center gap-3 mb-4 bg-slate-800 p-2 rounded-xl border border-slate-700 shrink-0">
                      <div className="w-10 h-10">

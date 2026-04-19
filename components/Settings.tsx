@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
+import CareerExport from './CareerExport';
 
 const Settings: React.FC = () => {
-  const { saveGame, loadGame, setView, retirePlayer, currentSlot, setPlayer } = useGame();
+  const { saveGame, loadGame, setView, retirePlayer, currentSlot, setPlayer, currentRound, player } = useGame();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [musicVol, setMusicVol] = useState(50);
   const [sfxVol, setSfxVol] = useState(80);
@@ -30,7 +31,12 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="p-4 pb-24 min-h-screen bg-slate-900">
+    <div className="p-4 pb-24 h-full bg-slate-900" style={{ 
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)'
+    }}>
       <div className="flex items-center justify-between mb-8">
           <h2 className="text-3xl font-black text-white italic uppercase">Settings</h2>
           <button 
@@ -131,6 +137,14 @@ const Settings: React.FC = () => {
             🔄 Change Career
           </button>
       </div>
+
+      {/* EXPORT / SHARE */}
+      {player && (
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 mb-8">
+              <h3 className="text-purple-400 font-bold uppercase text-sm mb-4 border-b border-slate-700 pb-2">Share Your Career</h3>
+              <CareerExport player={player} currentRound={currentRound} />
+          </div>
+      )}
 
       {/* DANGER ZONE / RETIREMENT */}
       <div className="bg-red-900/20 rounded-xl p-6 border border-red-500/50">

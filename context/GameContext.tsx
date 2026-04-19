@@ -1,13 +1,14 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { PlayerProfile, Team, Fixture, LeagueTier, Position, MatchResult, MatchEvent, Rivalry, PlayerInjury, Milestone, PerformerStats, Award, DraftClass, CareerEvent, Tactic } from '../types';
+import { PlayerProfile, Team, Fixture, LeagueTier, Position, MatchResult, MatchEvent, Rivalry, PlayerInjury, Milestone, PerformerStats, Award, DraftClass, CareerEvent, Tactic, SeasonObjective, PreSeasonCamp, View } from '../types';
+import { StorageService } from '../services/storageService';
 import { SEASON_LENGTH, TEAM_NAMES_LOCAL, FIRST_NAMES, LAST_NAMES, MILESTONES, RETIREMENT_AGE, SHOP_ITEMS } from '../constants';
 import { generateLeague, generateFixtures, updateLadderTeam, generateSemiFinals, generateGrandFinal } from '../utils/leagueUtils';
 import { calculateMatchOutcome, simulateCPUMatch } from '../utils/simulationUtils';
 import { checkAchievements } from '../utils/achievementUtils';
 import { canClaimDailyReward, claimDailyReward } from '../utils/dailyRewardUtils';
 import { shouldUpdateNickname, generateNickname } from '../utils/nicknameUtils';
-import { generateTransferOffers, shouldGenerateOffers, clearExpiredOffers, acceptTransferOffer } from '../utils/transferUtils';
+import { generateTransferOffers, shouldGenerateOffers, clearExpiredOffers, acceptTransferOffer, isFreeAgencyPeriod, generateFreeAgencyOffers } from '../utils/transferUtils';
 import { shouldPromote, shouldRelegate, getPromotedTier, getRelegatedTier, createSeasonHistory, generateNewSeasonSalary, applyAgingEffects } from '../utils/seasonUtils';
 import { calculateSeasonAwards } from '../utils/awardUtils';
 import { createDraftClass, shouldHoldDraft, simulateDraftPick, isPlayerDraftEligible, generateDraftClassWithPlayer, wasPlayerDrafted } from '../utils/draftUtils';
@@ -15,6 +16,12 @@ import { processLeagueRosterTurnover } from '../utils/rosterUtils';
 import { initializeMediaReputation, generateMediaEvent, updateMediaReputation, respondToMediaEvent, createSocialMediaPost, calculatePassiveFanGrowth } from '../utils/mediaUtils';
 import { generateCareerEvent, canGenerateNewEvent, resolveCareerEvent, resolveCareerEventChoice, generateFanMailEvent } from '../utils/careerEventUtils';
 import { initializeTeamChemistry, calculateOverallChemistry, updateTeamChemistryAfterMatch, generateTeammateInteraction, updateTeammateRelationship, incrementMatchesTogether, calculateChemistryBonus } from '../utils/chemistryUtils';
+import { generateSeasonObjectives, generateWeeklyObjectives, updateObjectiveProgress, applyObjectiveRewards, expireOldObjectives } from '../utils/objectiveUtils';
+import { generatePreSeasonCamp, completePreSeasonTraining, findTrainingPartner, applyTrainingPartnership } from '../utils/preSeasonUtils';
+import { generateStoryArcs, advanceStoryArc, resolveStoryArcChoice, checkArcCompletion, getArcLegacyImpact, finalizeArc } from '../utils/storyArcUtils';
+import { calculateLegacyScore, getLegacyTier, getLegacyBreakdown } from '../utils/legacyUtils';
+import { generateCommunityEvent, generateLockerRoomEvent, generateLegacyMoment, generateFanMail, generateSeasonBioParagraph } from '../utils/careerEventUtils';
+import { generateMediaConference, applyConferenceResponses } from '../utils/mediaUtils';
 import { initializeCoachingStaff, generateCoachInteraction, updateCoachRelationship, hireStaff, processStaffContracts } from '../utils/coachingUtils';
 
 interface GameContextType {
@@ -65,6 +72,14 @@ interface GameContextType {
   dismissSemiFinalsResults: () => void;
   showGrandFinalResult: boolean;
   dismissGrandFinalResult: () => void;
+  // Pre-season camp
+  preSeasonCamp: PreSeasonCamp | null;
+  startPreSeasonCamp: () => void;
+  completePreSeasonCamp: (focusAttr: string) => void;
+  // v1.3 Story Arcs
+  resolveStoryArcAction: (arcId: string, eventId: string, choiceId: string) => void;
+  // v1.3 Media Conference
+  respondToMediaConference: (conferenceId: string, questionId: string, responseId: string) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -75,10 +90,11 @@ const LEGACY_SAVE_KEY = 'footyLegendSave';
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [player, setPlayer] = useState<PlayerProfile | null>(null);
   const [currentSlot, setCurrentSlot] = useState<number>(0);
+  const [preSeasonCamp, setPreSeasonCamp] = useState<PreSeasonCamp | null>(null);
   const [league, setLeague] = useState<Team[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [currentRound, setCurrentRound] = useState(1);
-  const [view, setView] = useState<'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' | 'MILESTONES' | 'PLAYER_COMPARISON' | 'TRANSFER_MARKET' | 'SHOP' | 'SETTINGS' | 'CAREER_SUMMARY' | 'DRAFT' | 'MEDIA_HUB' | 'CAREER_EVENTS' | 'TEAM_CHEMISTRY' | 'COACHING_STAFF' | 'MASTER_SKILLS' | 'SLOT_SELECT'>('SLOT_SELECT');
+  const [view, setView] = useState<View>('SLOT_SELECT');
   const [lastMatchResult, setLastMatchResult] = useState<MatchResult | null>(null);
   const [showSeasonRecap, setShowSeasonRecap] = useState(false);
   const [seasonAwards, setSeasonAwards] = useState<Award[]>([]);
@@ -150,7 +166,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       teammates,
       teamChemistry,
       coachingStaff,
-      seenTips: {}
+      seenTips: {},
+      activeStoryArcs: [],
+      seasonObjectives: [],
     };
 
     updatedProfile.contract = {
@@ -159,6 +177,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       yearsLeft: 2,
       tier: LeagueTier.LOCAL
     };
+
+    // Initialize story arcs and season objectives after the profile is fully constructed
+    updatedProfile.activeStoryArcs = generateStoryArcs(updatedProfile, 1);
+    updatedProfile.seasonObjectives = generateSeasonObjectives(updatedProfile, 1);
 
     // 2. Inject User into Team Roster
     // Find the team in the league and swap the generic player in the user's slot with the user.
@@ -307,9 +329,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Check if Rivalry Match
       const rivalryMatch = player.rivalries?.find(r => r.club === opponent?.name);
-      if (rivalryMatch) {
-          if (myScore > oppScore) moraleChange += 15; // Beat rival
-          else if (myScore < oppScore) moraleChange -= 15; // Lost to rival
+      const isDerby = rivalryMatch && !rivalryMatch.resolved;
+      let derbyBonusXP = 0;
+      if (isDerby) {
+          if (myScore > oppScore) {
+              moraleChange += 15; // Beat rival
+              derbyBonusXP = 50; // Bonus XP for derby win
+          } else if (myScore < oppScore) {
+              moraleChange -= 15; // Lost to rival
+          }
       }
 
       // --- MILESTONE CHECKING ---
@@ -457,18 +485,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const playerWon = myScore > oppScore;
           const updatedRivalries = (prev.rivalries || []).map(r => {
               if (r.club !== opponentClub || r.resolved) return r;
-              const h2h = r.headToHead ?? { wins: 0, losses: 0 };
+              const h2h = r.headToHead ?? { wins: 0, losses: 0, draws: 0 };
+              const isDraw = myScore === oppScore;
               const newEvent = {
                   round: currentRound ?? 0,
                   year: prev.currentYear ?? 0,
-                  description: playerWon ? `Beat ${r.club}` : `Lost to ${r.club}`,
-                  intensityChange: playerWon ? 1 : 2,
+                  description: playerWon ? `Beat ${r.club}` : isDraw ? `Drew with ${r.club}` : `Lost to ${r.club}`,
+                  intensityChange: playerWon ? 1 : isDraw ? 0 : 2,
               };
               return {
                   ...r,
-                  headToHead: playerWon ? { ...h2h, wins: h2h.wins + 1 } : { ...h2h, losses: h2h.losses + 1 },
+                  headToHead: playerWon ? { ...h2h, wins: h2h.wins + 1 } : isDraw ? { ...h2h, draws: (h2h.draws || 0) + 1 } : { ...h2h, losses: h2h.losses + 1 },
                   history: [...(r.history ?? []), newEvent],
-                  intensity: escalateIntensity(r.intensity, playerWon ? 1 : 2),
+                  intensity: escalateIntensity(r.intensity, playerWon ? 1 : isDraw ? 0 : 2),
+                  derbyTrophyCount: playerWon ? (r.derbyTrophyCount || 0) + 1 : (r.derbyTrophyCount || 0),
+                  bonusXPEarned: playerWon ? (r.bonusXPEarned || 0) + derbyBonusXP : (r.bonusXPEarned || 0),
               };
           });
           if (result.newRivalry) {
@@ -504,7 +535,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           // Calculate match payment (salary per week)
           const matchPayment = prev.contract.salary || 0;
-          const newWallet = (prev.wallet || 0) + matchPayment;
+          let predictionBonusWallet = 0;
+          let predictionBonusXP = 0;
+          const newWallet = (prev.wallet || 0) + matchPayment + predictionBonusWallet;
           const newLifetimeEarnings = (prev.lifetimeEarnings || 0) + matchPayment;
 
           // Energy drain from match — use simulation-computed value when available
@@ -536,7 +569,20 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   goals: prev.seasonStats.goals + result.playerStats.goals,
                   disposals: prev.seasonStats.disposals + result.playerStats.disposals,
                   votes: prev.seasonStats.votes + result.playerStats.votes,
-                  tackles: prev.seasonStats.tackles + result.playerStats.tackles
+                  tackles: prev.seasonStats.tackles + result.playerStats.tackles,
+                  // Extended stats
+                  effectiveDisposals: (prev.seasonStats.effectiveDisposals || 0) + (result.playerStats.effectiveDisposals || 0),
+                  ineffectiveDisposals: (prev.seasonStats.ineffectiveDisposals || 0) + (result.playerStats.ineffectiveDisposals || 0),
+                  kicks: (prev.seasonStats.kicks || 0) + (result.playerStats.kicks || 0),
+                  handballs: (prev.seasonStats.handballs || 0) + (result.playerStats.handballs || 0),
+                  marks: (prev.seasonStats.marks || 0) + (result.playerStats.marks || 0),
+                  contendedPossessions: (prev.seasonStats.contendedPossessions || 0) + (result.playerStats.contendedPossessions || 0),
+                  inside50s: (prev.seasonStats.inside50s || 0) + (result.playerStats.inside50s || 0),
+                  clearances: (prev.seasonStats.clearances || 0) + (result.playerStats.clearances || 0),
+                  hitOuts: (prev.seasonStats.hitOuts || 0) + (result.playerStats.hitOuts || 0),
+                  brownlowVotes3: (prev.seasonStats.brownlowVotes3 || 0) + (result.playerStats.brownlowVotes3 || 0),
+                  brownlowVotes2: (prev.seasonStats.brownlowVotes2 || 0) + (result.playerStats.brownlowVotes2 || 0),
+                  brownlowVotes1: (prev.seasonStats.brownlowVotes1 || 0) + (result.playerStats.brownlowVotes1 || 0),
               },
               careerStats: {
                   ...prev.careerStats,
@@ -544,13 +590,86 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   goals: prev.careerStats.goals + result.playerStats.goals,
                   disposals: prev.careerStats.disposals + result.playerStats.disposals,
                   votes: prev.careerStats.votes + result.playerStats.votes,
-                  tackles: prev.careerStats.tackles + result.playerStats.tackles
+                  tackles: prev.careerStats.tackles + result.playerStats.tackles,
+                  // Extended stats
+                  effectiveDisposals: (prev.careerStats.effectiveDisposals || 0) + (result.playerStats.effectiveDisposals || 0),
+                  ineffectiveDisposals: (prev.careerStats.ineffectiveDisposals || 0) + (result.playerStats.ineffectiveDisposals || 0),
+                  kicks: (prev.careerStats.kicks || 0) + (result.playerStats.kicks || 0),
+                  handballs: (prev.careerStats.handballs || 0) + (result.playerStats.handballs || 0),
+                  marks: (prev.careerStats.marks || 0) + (result.playerStats.marks || 0),
+                  contendedPossessions: (prev.careerStats.contendedPossessions || 0) + (result.playerStats.contendedPossessions || 0),
+                  inside50s: (prev.careerStats.inside50s || 0) + (result.playerStats.inside50s || 0),
+                  clearances: (prev.careerStats.clearances || 0) + (result.playerStats.clearances || 0),
+                  hitOuts: (prev.careerStats.hitOuts || 0) + (result.playerStats.hitOuts || 0),
+                  brownlowVotes3: (prev.careerStats.brownlowVotes3 || 0) + (result.playerStats.brownlowVotes3 || 0),
+                  brownlowVotes2: (prev.careerStats.brownlowVotes2 || 0) + (result.playerStats.brownlowVotes2 || 0),
+                  brownlowVotes1: (prev.careerStats.brownlowVotes1 || 0) + (result.playerStats.brownlowVotes1 || 0),
               }
           };
 
           // Check for new achievements
           const newAchievements = checkAchievements(updatedPlayer, currentRound, 1, result);
           const existingAchievements = prev.achievements || [];
+
+          // --- SEASON OBJECTIVES TRACKING ---
+          const currentObjectives = prev.seasonObjectives || [];
+          const { updatedObjectives, completedIds } = updateObjectiveProgress(currentObjectives, {
+              disposals: result.playerStats.disposals,
+              goals: result.playerStats.goals,
+              tackles: result.playerStats.tackles,
+              marks: result.playerStats.marks || 0,
+              votes: result.playerStats.votes,
+              morale: newMorale,
+              trained: false, // Will be set when training occurs
+              won: myScore > oppScore
+          });
+
+          // Get completed objectives for rewards
+          const completedObjectives = updatedObjectives.filter(o => completedIds.includes(o.id));
+          const objectiveRewardedPlayer = completedObjectives.length > 0
+              ? applyObjectiveRewards(updatedPlayer, completedObjectives)
+              : updatedPlayer;
+
+          // Remove completed and expired objectives, add new weekly ones
+          const activeObjectives = expireOldObjectives(updatedObjectives, currentRound + 1);
+          const newWeeklyObjectives = generateWeeklyObjectives(objectiveRewardedPlayer, currentRound + 1);
+          const finalObjectives = [...activeObjectives, ...newWeeklyObjectives].slice(0, 8); // Max 8 active
+
+          // Update the player with objectives
+          const playerWithObjectives = {
+              ...objectiveRewardedPlayer,
+              seasonObjectives: finalObjectives
+          };
+
+          // Track bonus SP from objective rewards
+          const objectiveSPBonus = completedObjectives.reduce((sum, o) => sum + (o.reward.skillPoints || 0), 0);
+
+          // --- MATCH PREDICTION EVALUATION ---
+          const pred = prev.matchPrediction;
+          if (pred && pred.round === currentRound && !pred.completed) {
+              // Check margin prediction
+              const margin = Math.abs(myScore - oppScore);
+              let marginCorrect = false;
+              if (pred.predictedMargin === 'CLOSE' && margin <= 10) marginCorrect = true;
+              else if (pred.predictedMargin === 'COMFORTABLE' && margin > 10 && margin <= 30) marginCorrect = true;
+              else if (pred.predictedMargin === 'BLOWOUT' && margin > 30) marginCorrect = true;
+
+              if (marginCorrect) {
+                  predictionBonusWallet = pred.predictedMargin === 'BLOWOUT' ? 2000 : pred.predictedMargin === 'COMFORTABLE' ? 1000 : 500;
+              }
+
+              // Check stat predictions (within ±20% counts as correct)
+              const disposalsDiff = Math.abs(result.playerStats.disposals - pred.predictedDisposals) / Math.max(1, pred.predictedDisposals);
+              const goalsDiff = Math.abs(result.playerStats.goals - pred.predictedGoals) / Math.max(1, pred.predictedGoals);
+              if (disposalsDiff <= 0.2) predictionBonusXP += 100;
+              if (goalsDiff <= 0.2) predictionBonusXP += 100;
+
+              // Mark as completed
+              setPlayer(p => p ? {
+                  ...p,
+                  matchPrediction: { ...pred, completed: true, marginReward: predictionBonusWallet, statReward: predictionBonusXP }
+              } : null);
+          }
 
           // Check if nickname should be updated based on new performance
           let updatedNickname = updatedPlayer.nickname;
@@ -685,7 +804,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           return {
-              ...updatedPlayer,
+              ...playerWithObjectives,
               nickname: updatedNickname,
               achievements: [...existingAchievements, ...newAchievements],
               mediaReputation: updatedMediaRep,
@@ -694,7 +813,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               teamChemistry: updatedTeamChemistry,
               coachingStaff: updatedCoachingStaff,
               motivationBoost,
-              motivationExpiry: motivationExpiry > currentRound ? motivationExpiry : 0
+              motivationExpiry: motivationExpiry > currentRound ? motivationExpiry : 0,
+              skillPoints: playerWithObjectives.skillPoints + 1 + objectiveSPBonus + Math.floor(predictionBonusXP / 100), // Base 1 SP + objective + prediction bonus
           };
       });
   };
@@ -702,6 +822,45 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const advanceRound = () => {
       // LOGIC: Check if we are transitioning into finals
       const nextRound = currentRound + 1;
+
+      // --- TEAM SELECTION / OMISSION DRAMA ---
+      // Check if player should be dropped (poor form, low morale, coach conflict)
+      if (player && nextRound <= SEASON_LENGTH && !player.droppedToReserves) {
+          const avgDisposals = player.seasonStats.matches > 0 ? player.seasonStats.disposals / player.seasonStats.matches : 99;
+          const isPoorForm = avgDisposals < 12 && player.seasonStats.matches >= 3;
+          const isLowMorale = player.morale < 30;
+          const isCoachConflict = player.coachingStaff && (player.coachingStaff.staffRating < 30);
+
+          if (isPoorForm || isLowMorale || isCoachConflict) {
+              const reason = isPoorForm ? 'Poor form — averaging under 12 disposals' :
+                            isLowMorale ? 'Low morale affecting selection' :
+                            'Conflict with coaching staff';
+              setPlayer(prev => prev ? {
+                  ...prev,
+                  droppedToReserves: true,
+                  selectionDrama: {
+                      round: nextRound,
+                      reason,
+                      response: null,
+                      resolved: false,
+                  }
+              } : null);
+          }
+
+          // --- STATE OF ORIGIN SELECTION (Round 7) ---
+          if (nextRound === 7 && !player.selectedForRep) {
+              const avgDisps = player.seasonStats.matches > 0 ? player.seasonStats.disposals / player.seasonStats.matches : 0;
+              if (avgDisps >= 18 || player.seasonStats.goals >= 15) {
+                  const repTeam = player.contract.tier === LeagueTier.NATIONAL ? 'All-Stars' :
+                                 player.contract.tier === LeagueTier.STATE ? 'State Squad' : 'Country';
+                  setPlayer(prev => prev ? {
+                      ...prev,
+                      selectedForRep: true,
+                  } : null);
+                  // Add a career event about selection
+              }
+          }
+      }
 
       let nextFixtures = [...fixtures];
 
@@ -729,7 +888,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setShowSeasonRecap(true);
       }
 
+      // Clear completed match predictions so a new one can be made next round
       // Heal Player & Restore Energy
+      // (Combined into single setPlayer to avoid race condition)
       setPlayer(prev => {
           if(!prev) return null;
           let updatedInjury = prev.injury;
@@ -946,6 +1107,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Generate transfer offers if conditions are met
           let updatedOffers = clearExpiredOffers(prev.transferOffers || [], nextRound);
 
+          // Free Agency Period (Rounds 12-14): More aggressive offers
+          if (isFreeAgencyPeriod(nextRound)) {
+              const freeAgencyOffers = generateFreeAgencyOffers(prev, nextRound, league);
+              updatedOffers = [...updatedOffers, ...freeAgencyOffers];
+          }
+
           if (shouldGenerateOffers(prev, nextRound)) {
               const newOffers = generateTransferOffers(prev, nextRound, league, Math.floor(nextRound / SEASON_LENGTH) + 1);
               updatedOffers = [...updatedOffers, ...newOffers];
@@ -1067,7 +1234,62 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               attributes: agingResult?.attributes ?? prev.attributes,
               legacyScore: agingResult?.legacyScore ?? prev.legacyScore,
               itemsPurchased: agingResult?.itemsPurchased ?? prev.itemsPurchased,
+              matchPrediction: undefined,
           };
+      });
+
+      // Advance story arcs
+      setPlayer(prev => {
+        if (!prev) return null;
+        let updatedArcs = (prev.activeStoryArcs || []).map(arc => advanceStoryArc(arc, prev, nextRound));
+
+        // Check for new arcs to generate (e.g., after mid-season shift)
+        if (nextRound === 7) {
+          const newArcs = generateStoryArcs(prev, nextRound);
+          updatedArcs = [...updatedArcs, ...newArcs];
+        }
+
+        // Generate community/locker room/fan mail events
+        const newEvents: CareerEvent[] = [];
+        const communityEvent = generateCommunityEvent(prev, nextRound, prev.currentYear || 1);
+        if (communityEvent) newEvents.push(communityEvent);
+
+        const lockerEvent = generateLockerRoomEvent(prev, nextRound, prev.currentYear || 1, prev.teammates || []);
+        if (lockerEvent) newEvents.push(lockerEvent);
+
+        const legacyEvent = generateLegacyMoment(prev, nextRound, prev.currentYear || 1);
+        if (legacyEvent) newEvents.push(legacyEvent);
+
+        const fanMailEvent = generateFanMail(prev, nextRound, prev.currentYear || 1);
+        if (fanMailEvent) newEvents.push(fanMailEvent);
+
+        // Generate media conference if conditions met
+        let pendingConf = prev.pendingMediaConference;
+        const mediaRep = prev.mediaReputation;
+        if (mediaRep && !pendingConf && nextRound > 1) {
+          const score = mediaRep.score;
+          if (score < 30) pendingConf = generateMediaConference('CONTROVERSY_RESPONSE', prev, nextRound);
+          else if (score > 70 && nextRound % 4 === 0) pendingConf = generateMediaConference('MID_SEASON_CHECK', prev, nextRound);
+        }
+
+        // Generate biography paragraph at season end
+        let updatedBiography = prev.biography || (prev.bio ? [prev.bio] : []);
+        if (nextRound > SEASON_LENGTH) {
+          const bioParagraph = generateSeasonBioParagraph(prev, prev.careerHistory?.[prev.careerHistory.length - 1], prev.currentYear || 1);
+          if (bioParagraph) updatedBiography = [...updatedBiography, bioParagraph];
+        }
+
+        // Recalculate legacy score
+        const newLegacyScore = calculateLegacyScore(prev);
+
+        return {
+          ...prev,
+          activeStoryArcs: updatedArcs,
+          activeCareerEvents: [...(prev.activeCareerEvents || []), ...newEvents],
+          pendingMediaConference: pendingConf,
+          biography: updatedBiography,
+          legacyScore: newLegacyScore,
+        };
       });
 
       setView('DASHBOARD');
@@ -1173,7 +1395,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setView('DASHBOARD');
   };
 
-  const saveGame = () => {
+  const saveGame = async () => {
     if (!player) return;
     const gameState = {
       player,
@@ -1183,7 +1405,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastMatchResult
     };
     try {
-      localStorage.setItem(SAVE_KEY(currentSlot), JSON.stringify(gameState));
+      await StorageService.save(currentSlot, gameState);
     } catch (e) {
       console.error("Failed to save game", e);
     }
@@ -1471,19 +1693,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
   };
 
-  const loadGame = (slotOverride?: number) => {
+  const loadGame = async (slotOverride?: number) => {
     const slot = slotOverride !== undefined ? slotOverride : currentSlot;
     try {
-      // Migrate legacy save to slot 0 on first run
-      const legacy = localStorage.getItem(LEGACY_SAVE_KEY);
-      if (legacy && !localStorage.getItem(SAVE_KEY(0))) {
-        localStorage.setItem(SAVE_KEY(0), legacy);
-        localStorage.removeItem(LEGACY_SAVE_KEY);
-      }
-
-      const saved = localStorage.getItem(SAVE_KEY(slot));
-      if (saved) {
-        const data = JSON.parse(saved);
+      const data = await StorageService.load(slot);
+      if (data && (data as any).player) {
         if (data.player && data.league && data.fixtures) {
             // Migration for old saves missing energy
             if (data.player.energy === undefined) {
@@ -1831,29 +2045,139 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Only auto-save if we have a player and have attempted initial load
       if (player && hasAttemptedLoad) {
           console.log('Auto-saving game state...');
-          const gameState = {
-              player,
-              league,
-              fixtures,
-              currentRound,
-              lastMatchResult
+          const autoSave = async () => {
+              try {
+                  await StorageService.save(currentSlot, {
+                      player,
+                      league,
+                      fixtures,
+                      currentRound,
+                      lastMatchResult
+                  });
+                  console.log('Game auto-saved successfully');
+              } catch (e) {
+                  console.error("Failed to auto-save game", e);
+              }
           };
-          try {
-              localStorage.setItem(SAVE_KEY(currentSlot), JSON.stringify(gameState));
-              console.log('Game auto-saved successfully');
-          } catch (e) {
-              console.error("Failed to auto-save game", e);
-          }
+          autoSave();
       }
-  }, [player, league, fixtures, currentRound, lastMatchResult, hasAttemptedLoad]);
+  }, [player, league, fixtures, currentRound, lastMatchResult, hasAttemptedLoad, currentSlot]);
 
   const dismissFinalsIntro = () => setShowFinalsIntro(false);
   const dismissSemiFinalsResults = () => setShowSemiFinalsResults(false);
   const dismissGrandFinalResult = () => setShowGrandFinalResult(false);
 
+  // --- PRE-SEASON CAMP ---
+  const startPreSeasonCamp = () => {
+    if (!player) return;
+    const camp = generatePreSeasonCamp(player);
+    // Check for training partnership
+    if (player.teammates) {
+      const partner = findTrainingPartner(player, player.teammates);
+      if (partner) {
+        camp.trainingPartnership = partner;
+      }
+    }
+    setPreSeasonCamp(camp);
+  };
+
+  const completePreSeasonCamp = (focusAttr: string) => {
+    if (!player || !preSeasonCamp) return;
+    const updatedCamp = { ...preSeasonCamp, focusAttribute: focusAttr as any, completed: true };
+    const updatedPlayer = completePreSeasonTraining(player, updatedCamp);
+    if (updatedCamp.trainingPartnership) {
+      applyTrainingPartnership(updatedPlayer, updatedCamp.trainingPartnership);
+    }
+    setPlayer(updatedPlayer);
+    setPreSeasonCamp(updatedCamp);
+  };
+
+  // ===== v1.3 STORY ARC ACTIONS =====
+  const resolveStoryArcAction = (arcId: string, eventId: string, choiceId: string) => {
+    setPlayer(prev => {
+      if (!prev) return null;
+      const arc = prev.activeStoryArcs?.find(a => a.id === arcId);
+      if (!arc) return prev;
+
+      const { updatedArc, effects } = resolveStoryArcChoice(arc, eventId, choiceId, prev);
+
+      // Apply effects
+      let updatedPlayer = { ...prev };
+      if (effects.morale) updatedPlayer.morale = Math.max(0, Math.min(100, updatedPlayer.morale + effects.morale));
+      if (effects.mediaReputation && updatedPlayer.mediaReputation) {
+        updatedPlayer.mediaReputation = { ...updatedPlayer.mediaReputation, score: Math.max(0, Math.min(100, updatedPlayer.mediaReputation.score + effects.mediaReputation)) };
+      }
+      if (effects.fanFollowers && updatedPlayer.mediaReputation) {
+        updatedPlayer.mediaReputation = { ...updatedPlayer.mediaReputation, fanFollowers: updatedPlayer.mediaReputation.fanFollowers + effects.fanFollowers };
+      }
+      if (effects.wallet) updatedPlayer.wallet = (updatedPlayer.wallet || 0) + effects.wallet;
+      if (effects.energy) updatedPlayer.energy = Math.max(0, Math.min(100, updatedPlayer.energy + effects.energy));
+      if (effects.resultText) { /* Store for display */ }
+
+      // Update narrative tags
+      const choice = updatedArc.events.find(e => e.id === eventId)?.choices?.find(c => c.id === choiceId);
+      if (choice) {
+        updatedPlayer.narrativeTags = [...(updatedPlayer.narrativeTags || []), choice.narrativeTag];
+      }
+
+      // Update arcs
+      const updatedArcs = (prev.activeStoryArcs || []).map(a => a.id === arcId ? updatedArc : a);
+      const completedArcs = updatedArcs.filter(a => checkArcCompletion(a, prev));
+      const stillActive = updatedArcs.filter(a => !checkArcCompletion(a, prev));
+
+      // Finalize completed arcs
+      const finalized = completedArcs.map(a => finalizeArc(a));
+      const legacyFromArcs = finalized.reduce((sum, a) => sum + a.legacyImpact, 0);
+      updatedPlayer.legacyScore = (updatedPlayer.legacyScore || 0) + legacyFromArcs;
+
+      return {
+        ...updatedPlayer,
+        activeStoryArcs: stillActive,
+        completedStoryArcs: [...(prev.completedStoryArcs || []), ...finalized],
+      };
+    });
+  };
+
+  // ===== v1.3 MEDIA CONFERENCE ACTIONS =====
+  const respondToMediaConference = (conferenceId: string, questionId: string, responseId: string) => {
+    setPlayer(prev => {
+      if (!prev || !prev.pendingMediaConference) return prev;
+      if (prev.pendingMediaConference.id !== conferenceId) return prev;
+
+      const updatedConference = {
+        ...prev.pendingMediaConference,
+        responses: { ...prev.pendingMediaConference.responses, [questionId]: responseId },
+      };
+
+      // Check if all questions answered
+      const allAnswered = updatedConference.questions.every(q => updatedConference.responses[q.id]);
+      if (!allAnswered) {
+        return { ...prev, pendingMediaConference: updatedConference };
+      }
+
+      // Apply conference effects
+      const effects = applyConferenceResponses(updatedConference, prev);
+      let updatedPlayer = { ...prev };
+
+      if (updatedPlayer.mediaReputation) {
+        updatedPlayer.mediaReputation = {
+          ...updatedPlayer.mediaReputation,
+          score: Math.max(0, Math.min(100, updatedPlayer.mediaReputation.score + effects.reputationChange)),
+          fanFollowers: Math.max(0, updatedPlayer.mediaReputation.fanFollowers + effects.fanChange),
+        };
+      }
+
+      return {
+        ...updatedPlayer,
+        pendingMediaConference: undefined,
+        mediaConferenceHistory: [...(prev.mediaConferenceHistory || []), { ...updatedConference, completed: true, totalReputationChange: effects.reputationChange }],
+      };
+    });
+  };
+
   return (
     <GameContext.Provider value={{
-        player, setPlayer, league, fixtures, currentRound, startNewGame, generateMatchSimulation, setRehabChoice, useCaptainSpeech, commitMatchResult, trainAttribute, advanceRound, simulateRound, view, setView, lastMatchResult, saveGame, loadGame, acknowledgeMilestone, retirePlayer, resetGame, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap, seasonAwards, dismissAwardsCeremony, draftClass, draftProspect, simulateDraft, completeDraft, acceptTransfer, rejectTransfer, purchaseItem, respondToMedia: respondToMediaFn, createSocialPost: createSocialPostFn, resolveEvent: resolveEventFn, resolveEventChoice: resolveEventChoiceFn, hireCoachingStaff: hireCoachingStaffFn, showFinalsIntro, dismissFinalsIntro, showSemiFinalsResults, dismissSemiFinalsResults, showGrandFinalResult, dismissGrandFinalResult, currentSlot, setCurrentSlot
+        player, setPlayer, league, fixtures, currentRound, startNewGame, generateMatchSimulation, setRehabChoice, useCaptainSpeech, commitMatchResult, trainAttribute, advanceRound, simulateRound, view, setView, lastMatchResult, saveGame, loadGame, acknowledgeMilestone, retirePlayer, resetGame, canClaimReward, claimReward, showSeasonRecap, dismissSeasonRecap, seasonAwards, dismissAwardsCeremony, draftClass, draftProspect, simulateDraft, completeDraft, acceptTransfer, rejectTransfer, purchaseItem, respondToMedia: respondToMediaFn, createSocialPost: createSocialPostFn, resolveEvent: resolveEventFn, resolveEventChoice: resolveEventChoiceFn, hireCoachingStaff: hireCoachingStaffFn, showFinalsIntro, dismissFinalsIntro, showSemiFinalsResults, dismissSemiFinalsResults, showGrandFinalResult, dismissGrandFinalResult, currentSlot, setCurrentSlot, preSeasonCamp, startPreSeasonCamp, completePreSeasonCamp, resolveStoryArcAction, respondToMediaConference
     }}>
       {children}
     </GameContext.Provider>

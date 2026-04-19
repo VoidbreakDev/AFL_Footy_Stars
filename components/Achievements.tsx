@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { ACHIEVEMENTS } from '../constants';
 import { hasAchievement, getAchievementProgress, getRarityColor } from '../utils/achievementUtils';
+import BackHeader from './BackHeader';
 
 const Achievements: React.FC = () => {
   const { player, setView } = useGame();
@@ -21,19 +22,13 @@ const Achievements: React.FC = () => {
   const completionPercentage = Math.floor((unlockedCount / totalCount) * 100);
 
   return (
-    <div className="flex flex-col h-full pb-24 bg-slate-950">
-      {/* Header */}
-      <div className="bg-slate-800 p-4 border-b border-slate-700 shadow-xl relative">
-        <button
-          onClick={() => setView('DASHBOARD')}
-          className="absolute top-4 left-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-700 text-slate-300 hover:bg-white hover:text-slate-900 transition-colors z-20"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-
-        <div className="text-center">
+    <div className="min-h-screen bg-slate-900 text-white">
+      <BackHeader
+        title="Achievements"
+        onBack={() => setView('DASHBOARD')}
+      />
+      <div className="p-4 pb-24">
+        <div className="text-center mb-6">
           <h1 className="text-2xl font-black text-white uppercase italic">Achievements</h1>
           <p className="text-sm text-slate-400">
             {unlockedCount} / {totalCount} Unlocked ({completionPercentage}%)

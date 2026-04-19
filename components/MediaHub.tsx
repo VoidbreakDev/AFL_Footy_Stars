@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { MediaEvent } from '../types';
+import { MediaEvent, MediaConferenceQuestion, MediaConferenceResponse } from '../types';
+
+const MEDIA_RESPONSES: MediaConferenceResponse[] = [
+  { id: 'confident', label: 'Confident', text: '"We know what we\'re capable of. We\'ll show it on the field."', tone: 'CONFIDENT', reputationChange: 3, fanChange: 100, coachTrustChange: 2 },
+  { id: 'humble', label: 'Humble', text: '"Credit to the boys and the coaches. I\'m just doing my job."', tone: 'HUMBLE', reputationChange: 5, fanChange: 50, coachTrustChange: 3 },
+  { id: 'deflect', label: 'Deflect', text: '"I\'d rather focus on next week\'s game than talk about myself."', tone: 'DEFLECT', reputationChange: -2, fanChange: -50, coachTrustChange: 0 },
+  { id: 'controversial', label: 'Controversial', text: '"Some people just don\'t understand what it takes to play this game."', tone: 'CONTROVERSIAL', reputationChange: -8, fanChange: 200, coachTrustChange: -5 },
+  { id: 'diplomatic', label: 'Diplomatic', text: '"Every week is a learning opportunity. We\'ll review and improve."', tone: 'DIPLOMATIC', reputationChange: 2, fanChange: 30, coachTrustChange: 1 },
+];
 
 const MediaHub: React.FC = () => {
-    const { player, respondToMedia, createSocialPost } = useGame();
-    const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'EVENTS' | 'POST'>('OVERVIEW');
+    const { player, respondToMedia, createSocialPost, respondToMediaConference } = useGame();
+    const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'EVENTS' | 'PRESSER' | 'POST'>('OVERVIEW');
     const [postContent, setPostContent] = useState('');
+    const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
 
     if (!player || !player.mediaReputation) return null;
 
@@ -156,6 +165,17 @@ const MediaHub: React.FC = () => {
                     )}
                 </button>
                 <button
+                    onClick={() => { setActiveTab('PRESSER'); setCurrentQuestionIdx(0); }}
+                    className={`flex-1 py-3 rounded-lg font-bold text-xs uppercase transition-all relative ${
+                        activeTab === 'PRESSER' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'
+                    }`}
+                >
+                    Presser
+                    {player.pendingMediaConference && !player.pendingMediaConference.completed && (
+                        <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center">!</span>
+                    )}
+                </button>
+                <button
                     onClick={() => setActiveTab('POST')}
                     className={`flex-1 py-3 rounded-lg font-bold text-xs uppercase transition-all ${
                         activeTab === 'POST' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'
@@ -167,6 +187,109 @@ const MediaHub: React.FC = () => {
 
             {/* Content */}
             <div className="px-4">
+                {/* PRESSER TAB */}
+                {activeTab === 'PRESSER' && (
+                    <div className="space-y-4">
+                        {player.pendingMediaConference ? (() => {
+                            const conf = player.pendingMediaConference;
+                            const q = conf.questions[currentQuestionIdx];
+                            const allAnswered = conf.questions.every(qq => conf.responses[qq.id]);
+
+                            if (allAnswered) {
+                                return (
+                                    <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 text-center">
+                                        <div className="text-4xl mb-3">🎤</div>
+                                        <h3 className="text-xl font-black text-white uppercase mb-2">Press Conference Complete</h3>
+                                        <p className="text-slate-400 text-sm mb-4">Your responses have been recorded.</p>
+                                        <div className="bg-slate-900 rounded-lg p-3 mb-4">
+                                            <div className="text-xs text-slate-500 uppercase font-bold mb-1">Reputation Impact</div>
+                                            <div className="text-lg font-black text-purple-400">{conf.totalReputationChange > 0 ? '+' : ''}{conf.totalReputationChange}</div>
+                                        </div>
+                                        <button onClick={() => setActiveTab('OVERVIEW')} className="px-6 py-2 bg-purple-600 rounded-lg text-white font-bold text-sm uppercase">Back to Overview</button>
+                                    </div>
+                                );
+                            }
+
+                            const toneIcon = (tone: string) => tone === 'HOSTILE' ? '😠' : tone === 'FRIENDLY' ? '😊' : tone === 'PROBING' ? '🔍' : '😐';
+
+                            return (
+                                <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                                    <div className="bg-gradient-to-r from-indigo-900/50 to-purple-900/50 p-4 border-b border-slate-700">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h3 className="text-white font-black text-lg uppercase">{conf.title}</h3>
+                                                <p className="text-slate-400 text-xs">{conf.type.replace(/_/g, ' ')} • Round {conf.round}, Year {conf.year}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-xs text-slate-500">Q{currentQuestionIdx + 1}/{conf.questions.length}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="p-4">
+                                        <div className="flex items-start gap-3 mb-4">
+                                            <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-lg flex-shrink-0">🎙️</div>
+                                            <div>
+                                                <div className="flex items-center gap-1 mb-1">
+                                                    <span className="text-xs">{toneIcon(q.tone)}</span>
+                                                    <span className="text-[10px] text-slate-500 uppercase font-bold">{q.tone}</span>
+                                                </div>
+                                                <p className="text-white font-bold text-sm mb-1">{q.question}</p>
+                                                <p className="text-slate-500 text-xs italic">{q.context}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Response Options */}
+                                        <div className="space-y-2">
+                                            {MEDIA_RESPONSES.map(resp => {
+                                                const isSelected = conf.responses[q.id] === resp.id;
+                                                const repColor = resp.reputationChange > 0 ? 'text-emerald-400' : resp.reputationChange < 0 ? 'text-red-400' : 'text-slate-400';
+                                                return (
+                                                    <button
+                                                        key={resp.id}
+                                                        onClick={() => {
+                                                            if (respondToMediaConference) {
+                                                                respondToMediaConference(conf.id, q.id, resp.id);
+                                                            }
+                                                            if (currentQuestionIdx < conf.questions.length - 1) {
+                                                                setCurrentQuestionIdx(i => i + 1);
+                                                            }
+                                                        }}
+                                                        className={`w-full p-3 rounded-lg border text-left transition-all ${
+                                                            isSelected
+                                                                ? 'bg-purple-600/20 border-purple-500'
+                                                                : 'bg-slate-900/50 border-slate-700/50 hover:border-purple-500/50'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div>
+                                                                <div className="text-white font-bold text-xs">{resp.label}</div>
+                                                                <div className="text-slate-500 text-[10px] italic">{resp.text}</div>
+                                                            </div>
+                                                            <div className="text-right flex-shrink-0 ml-2">
+                                                                <div className="text-[10px] font-bold">Tone: {resp.tone}</div>
+                                                                <div className={`text-[10px] font-bold ${repColor}`}>
+                                                                    Rep: {resp.reputationChange > 0 ? '+' : ''}{resp.reputationChange}
+                                                                    {' '}Fans: {resp.fanChange > 0 ? '+' : ''}{resp.fanChange}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })() : (
+                            <div className="bg-slate-800 p-8 rounded-xl border border-slate-700 text-center">
+                                <div className="text-4xl mb-3">📋</div>
+                                <h3 className="text-lg font-black text-white uppercase mb-2">No Press Conferences</h3>
+                                <p className="text-slate-400 text-sm">Press conferences are generated automatically based on your media reputation and recent performances. Build your profile to get called up.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* OVERVIEW TAB */}
                 {activeTab === 'OVERVIEW' && (
                     <div className="space-y-6">

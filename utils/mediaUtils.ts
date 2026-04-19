@@ -1,4 +1,4 @@
-import { PlayerProfile, MatchResult, MediaEvent, MediaReputation, FanMilestone, LeagueTier, CultureType } from '../types';
+import { PlayerProfile, MatchResult, MediaEvent, MediaReputation, FanMilestone, LeagueTier, CultureType, MediaConference, MediaConferenceQuestion, MediaConferenceResponse, MediaConferenceType } from '../types';
 
 // Fan milestone thresholds
 const FAN_MILESTONES: Omit<FanMilestone, 'unlocked'>[] = [
@@ -10,6 +10,116 @@ const FAN_MILESTONES: Omit<FanMilestone, 'unlocked'>[] = [
     { followers: 500000, title: 'Superstar', icon: '💫' },
     { followers: 1000000, title: 'Legend', icon: '👑' }
 ];
+
+// ===== v1.3 MEDIA CONFERENCE SYSTEM =====
+
+const MEDIA_QUESTIONS_POOL: Record<MediaConferenceType, { q: string; context: string; tone: MediaConferenceQuestion['tone'] }[]> = {
+  PRE_MATCH: [
+    { q: 'What\'s your mindset heading into this week\'s game?', context: 'Pre-match build-up', tone: 'NEUTRAL' },
+    { q: 'How important is this match for your season goals?', context: 'Season context', tone: 'PROBING' },
+    { q: 'The opposition has been talking up their chances. Your response?', context: 'Rival pre-match comments', tone: 'NEUTRAL' },
+  ],
+  POST_MATCH_WIN: [
+    { q: 'What a performance! What was the key to today\'s victory?', context: 'Big win', tone: 'FRIENDLY' },
+    { q: 'Your disposal count was elite. What\'s clicking for you right now?', context: 'Strong stats', tone: 'FRIENDLY' },
+    { q: 'The fans are loving this run of form. How do you keep the momentum?', context: 'Fan enthusiasm', tone: 'NEUTRAL' },
+  ],
+  POST_MATCH_LOSS: [
+    { q: 'Tough day at the office. What went wrong out there?', context: 'Heavy loss', tone: 'PROBING' },
+    { q: 'Some are questioning your form. Do you feel the pressure?', context: 'Poor individual performance', tone: 'HOSTILE' },
+    { q: 'The coach looked frustrated at three-quarter time. What was said?', context: 'Coach tension', tone: 'PROBING' },
+  ],
+  MID_SEASON_CHECK: [
+    { q: 'Halfway through the season. Are you happy with where things are at?', context: 'Season midpoint', tone: 'NEUTRAL' },
+    { q: 'Your reputation has taken a hit recently. How do you turn it around?', context: 'Reputation drop', tone: 'HOSTILE' },
+    { q: 'The club\'s season is trending upward. How much of that is you?', context: 'Team success', tone: 'FRIENDLY' },
+  ],
+  CONTROVERSY_RESPONSE: [
+    { q: 'There\'s been a lot of noise about your off-field activities. Can you address it?', context: 'Off-field incident', tone: 'HOSTILE' },
+    { q: 'Former players have weighed in on your situation. Any comment?', context: 'Public criticism', tone: 'PROBING' },
+    { q: 'Fans are divided on this. What\'s your side of the story?', context: 'Fan division', tone: 'HOSTILE' },
+  ],
+  CONTRACT_QUESTION: [
+    { q: 'Your contract situation is unresolved. What\'s the hold-up?', context: 'Contract year', tone: 'PROBING' },
+    { q: 'Are you committed to this club or looking elsewhere?', context: 'Trade speculation', tone: 'HOSTILE' },
+    { q: 'The club says they want to keep you. Do you want to stay?', context: 'Club commitment', tone: 'NEUTRAL' },
+  ],
+  FORM_SLUMP: [
+    { q: 'It\'s been a few quiet weeks. What\'s missing from your game?', context: 'Low disposals/goals', tone: 'PROBING' },
+    { q: 'Selection pressure is real. Are you worried about your spot?', context: 'Reserves threat', tone: 'HOSTILE' },
+    { q: 'Your body language looked off last week. Is everything okay?', context: 'Morale concerns', tone: 'PROBING' },
+  ],
+};
+
+const MEDIA_RESPONSES_POOL: MediaConferenceResponse[] = [
+  { id: 'confident', label: 'Confident', text: '"We know what we\'re capable of. We\'ll show it on the field."', tone: 'CONFIDENT', reputationChange: 3, fanChange: 100, coachTrustChange: 2 },
+  { id: 'humble', label: 'Humble', text: '"Credit to the boys and the coaches. I\'m just doing my job."', tone: 'HUMBLE', reputationChange: 5, fanChange: 50, coachTrustChange: 3 },
+  { id: 'deflect', label: 'Deflect', text: '"I\'d rather focus on next week\'s game than talk about myself."', tone: 'DEFLECT', reputationChange: -2, fanChange: -50, coachTrustChange: 0 },
+  { id: 'controversial', label: 'Controversial', text: '"Some people just don\'t understand what it takes to play this game."', tone: 'CONTROVERSIAL', reputationChange: -8, fanChange: 200, coachTrustChange: -5 },
+  { id: 'diplomatic', label: 'Diplomatic', text: '"Every week is a learning opportunity. We\'ll review and improve."', tone: 'DIPLOMATIC', reputationChange: 2, fanChange: 30, coachTrustChange: 1 },
+];
+
+export const generateMediaConference = (
+  type: MediaConferenceType,
+  player: PlayerProfile,
+  round: number,
+  matchResult?: MatchResult
+): MediaConference => {
+  const questionPool = MEDIA_QUESTIONS_POOL[type];
+  const numQuestions = Math.min(3, 2 + (player.mediaReputation?.score || 0 > 50 ? 1 : 0));
+  const shuffled = [...questionPool].sort(() => Math.random() - 0.5);
+  const selected = shuffled.slice(0, numQuestions);
+
+  const questions: MediaConferenceQuestion[] = selected.map((q, i) => ({
+    id: `q-${type}-${round}-${i}-${Date.now()}`,
+    question: q.q,
+    context: q.context,
+    tone: q.tone,
+  }));
+
+  const titles: Record<MediaConferenceType, string> = {
+    PRE_MATCH: 'Pre-Match Presser',
+    POST_MATCH_WIN: 'Post-Match Victory',
+    POST_MATCH_LOSS: 'Post-Match Review',
+    MID_SEASON_CHECK: 'Mid-Season Check-In',
+    CONTROVERSY_RESPONSE: 'Controversy Response',
+    CONTRACT_QUESTION: 'Contract Talks',
+    FORM_SLUMP: 'Form Slump Questions',
+  };
+
+  return {
+    id: `conf-${type}-${round}-${Date.now()}`,
+    type,
+    title: titles[type],
+    round,
+    year: player.currentYear || 1,
+    questions,
+    responses: {},
+    completed: false,
+    totalReputationChange: 0,
+  };
+};
+
+export const applyConferenceResponses = (
+  conference: MediaConference,
+  player: PlayerProfile
+): { reputationChange: number; fanChange: number; coachTrustChange: number } => {
+  let totalRep = 0;
+  let totalFan = 0;
+  let totalCoach = 0;
+
+  conference.questions.forEach(q => {
+    const responseId = conference.responses[q.id];
+    if (!responseId) return;
+    const response = MEDIA_RESPONSES_POOL.find(r => r.id === responseId);
+    if (!response) return;
+    totalRep += response.reputationChange;
+    totalFan += response.fanChange;
+    totalCoach += response.coachTrustChange || 0;
+  });
+
+  return { reputationChange: totalRep, fanChange: totalFan, coachTrustChange: totalCoach };
+};
 
 // Calculate reputation tier based on score
 export const getReputationTier = (score: number): MediaReputation['tier'] => {

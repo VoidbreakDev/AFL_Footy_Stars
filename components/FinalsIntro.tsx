@@ -23,7 +23,13 @@ const FinalsIntro: React.FC<FinalsIntroProps> = ({ player, league, onContinue })
   const finalistsTeams = sortedLeague.slice(0, 4);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4 animate-fade-in" style={{ 
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh'
+    }}>
       <div className="max-w-4xl w-full">
         {/* Header */}
         <div className="text-center mb-8 animate-slide-down">
