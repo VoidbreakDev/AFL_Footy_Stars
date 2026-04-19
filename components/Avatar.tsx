@@ -13,7 +13,7 @@ const Avatar: React.FC<AvatarProps> = ({ avatar, teamColors, className }) => {
     const primaryColor = teamColors ? teamColors[0] : '#334155'; 
     const secondaryColor = teamColors ? teamColors[1] : '#ffffff';
     
-    const faceUrl = getFaceUrl(avatar.faceId);
+    const faceUrl = getFaceUrl(avatar.faceId, avatar.style);
 
     return (
         <div className={`${className} relative overflow-hidden rounded-full bg-slate-300`}>

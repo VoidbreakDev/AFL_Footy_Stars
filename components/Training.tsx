@@ -139,11 +139,15 @@ import TipCard from './TipCard';
 const Training: React.FC = () => {
   const { player, trainAttribute, setView, setRehabChoice, currentRound, setPlayer } = useGame();
   const [chosenRehab, setChosenRehab] = useState<'REST' | 'LIGHT' | 'PUSH' | null>(null);
-  const [activeDrill, setActiveDrill] = useState<'KICK' | 'REACTION' | 'STRENGTH' | null>(null);
-  const [drillDone, setDrillDone] = useState(false);
+  const [expandedAttr, setExpandedAttr] = useState<string | null>(null);
   const [drillResult, setDrillResult] = useState<string | null>(null);
 
   const drillType = (['KICK', 'REACTION', 'STRENGTH'] as const)[currentRound % 3];
+  const drillKey = `drill_round_${currentRound}`;
+  const drillAlreadyDone = !!player.seenTips?.[drillKey];
+
+  const [activeDrill, setActiveDrill] = useState<'KICK' | 'REACTION' | 'STRENGTH' | null>(null);
+  const [drillDone, setDrillDone] = useState(drillAlreadyDone);
 
   const completeDrill = (raw: number) => {
     let spBonus = 0;
@@ -160,9 +164,12 @@ const Training: React.FC = () => {
     }
     setDrillResult(resultMsg);
     setDrillDone(true);
-    if (spBonus > 0) {
-      setPlayer((prev: any) => prev ? { ...prev, skillPoints: prev.skillPoints + spBonus } : prev);
-    }
+    // Persist drill completion to player profile
+    setPlayer((prev: any) => prev ? {
+      ...prev,
+      skillPoints: prev.skillPoints + spBonus,
+      seenTips: { ...(prev.seenTips || {}), [drillKey]: true }
+    } : prev);
   };
 
   if (!player) return null;
@@ -179,7 +186,12 @@ const Training: React.FC = () => {
   };
 
   return (
-    <div className="p-4 pb-24 min-h-screen bg-slate-900">
+    <div className="p-4 pb-24 h-full bg-slate-900" style={{ 
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)'
+    }}>
 
       <TipCard tipKey="TRAINING" title="Training Tips" body="Spend Skill Points to improve your attributes. Each attribute has a cap set by your potential rating." />
 
@@ -317,83 +329,114 @@ const Training: React.FC = () => {
           )}
       </div>
 
-      {/* Attribute Cards */}
-      <div className="grid gap-3">
+      {/* Attribute Cards - Accordion Style */}
+      <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+              <p className="text-slate-400 text-xs uppercase font-bold">Attributes</p>
+              <p className="text-slate-500 text-[10px]">Tap to expand</p>
+          </div>
           {attributes.map(attr => {
               const currentValue = player.attributes[attr];
               const isCapped = currentValue >= player.potential;
               const canAfford = player.skillPoints > 0 && player.energy >= 10;
               const isProjected = canAfford && !isCapped;
+              const isExpanded = expandedAttr === attr;
+              const attrLabel = attr.replace(/([A-Z])/g, ' $1').trim();
 
               return (
-                  <div key={attr} className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm relative overflow-hidden group">
-                      
-                      <div className="flex justify-between items-center mb-2 relative z-10">
-                          <div className="capitalize font-bold text-slate-200 text-lg flex items-center gap-1">
-                              {attr.replace(/([A-Z])/g, ' $1').trim()}
-                              {player.age >= 30 && (attr === 'speed' || attr === 'stamina') && (
-                                  <span className="text-amber-400 text-xs" title="Declining with age — consider Recovery items.">📉</span>
-                              )}
-                          </div>
-                          
-                          {/* Value Display with Projection */}
-                          <div className="flex items-center gap-2 bg-slate-950/50 px-3 py-1 rounded-lg">
-                              <span className={`font-mono text-xl font-bold ${isCapped ? 'text-yellow-400' : 'text-white'}`}>
-                                  {currentValue}
-                              </span>
-                              {isProjected && (
-                                  <>
-                                    <span className="text-slate-600 text-xs">➜</span>
-                                    <span className="font-mono text-xl font-bold text-emerald-400 animate-pulse">
-                                        {currentValue + 1}
-                                    </span>
-                                  </>
-                              )}
-                          </div>
-                      </div>
-
-                      {/* Progress Bar Container */}
-                      <div className="relative w-full h-3 bg-slate-950 rounded-full overflow-hidden mb-3">
-                          {/* 1. Base Fill */}
-                          <div 
-                            className={`absolute top-0 left-0 h-full transition-all duration-500 ease-out ${isCapped ? 'bg-yellow-500' : 'bg-emerald-600'}`} 
-                            style={{width: `${(currentValue / 99) * 100}%`}}
-                          ></div>
-                          
-                          {/* 2. Projected Fill (Ghost Bar) */}
-                          {isProjected && (
-                              <div 
-                                className="absolute top-0 h-full bg-emerald-400/50 transition-all duration-300 animate-pulse"
-                                style={{
-                                    left: `${(currentValue / 99) * 100}%`,
-                                    width: `${(1 / 99) * 100}%` 
-                                }}
-                              ></div>
-                          )}
-                      </div>
-
-                      {/* Action Button */}
-                      <button 
-                        onClick={() => trainAttribute(attr)}
-                        disabled={!canAfford || isCapped}
-                        className={`w-full py-3 rounded-lg font-black text-xs uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${
-                            isCapped 
-                                ? 'bg-slate-700 text-yellow-500 cursor-not-allowed border border-yellow-500/30' 
-                                : !canAfford 
-                                    ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                                    : 'bg-white hover:bg-emerald-50 text-slate-900 shadow-lg shadow-white/10'
-                        }`}
+                  <div key={attr} className={`rounded-xl border overflow-hidden transition-all ${isExpanded ? 'border-slate-600 bg-slate-800' : 'border-slate-700/50 bg-slate-800/70'}`}>
+                      {/* Collapsed Header - Always Visible */}
+                      <button
+                          onClick={() => setExpandedAttr(isExpanded ? null : attr)}
+                          className="w-full flex items-center justify-between p-3"
                       >
-                          {isCapped ? (
-                              <><span>🔒</span> Maxed Out</>
-                          ) : player.energy < 10 ? (
-                              <><span>💤</span> Too Tired</>
-                          ) : player.skillPoints === 0 ? (
-                              <><span>🚫</span> No SP</>
-                          ) : (
-                              <><span>⚡</span> Train (-10 Energy)</>
-                          )}
+                          <div className="flex items-center gap-3 flex-1">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${isCapped ? 'bg-yellow-500/20 text-yellow-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                  {currentValue}
+                              </div>
+                              <div className="text-left">
+                                  <div className="capitalize font-bold text-slate-200 text-sm flex items-center gap-1">
+                                      {attrLabel}
+                                      {player.age >= 30 && (attr === 'speed' || attr === 'stamina') && (
+                                          <span className="text-amber-400 text-[10px]" title="Declining with age">📉</span>
+                                      )}
+                                  </div>
+                              </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                              {/* Mini Progress Bar */}
+                              <div className="w-16 h-1.5 bg-slate-950 rounded-full overflow-hidden">
+                                  <div
+                                      className={`h-full rounded-full ${isCapped ? 'bg-yellow-500' : 'bg-emerald-600'}`}
+                                      style={{width: `${(currentValue / 99) * 100}%`}}
+                                  ></div>
+                              </div>
+                              {/* Chevron */}
+                              <svg className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                          </div>
                       </button>
+
+                      {/* Expanded Content */}
+                      {isExpanded && (
+                          <div className="px-3 pb-3 border-t border-slate-700/50 pt-3">
+                              {/* Projected Value */}
+                              <div className="flex items-center justify-between mb-3">
+                                  <span className="text-[10px] text-slate-500 uppercase">Current → Next</span>
+                                  <div className="flex items-center gap-2">
+                                      <span className={`font-mono text-lg font-bold ${isCapped ? 'text-yellow-400' : 'text-white'}`}>{currentValue}</span>
+                                      {isProjected && (
+                                          <>
+                                              <span className="text-slate-600 text-xs">➜</span>
+                                              <span className="font-mono text-lg font-bold text-emerald-400">{currentValue + 1}</span>
+                                          </>
+                                      )}
+                                  </div>
+                              </div>
+
+                              {/* Full Progress Bar */}
+                              <div className="relative w-full h-2 bg-slate-950 rounded-full overflow-hidden mb-3">
+                                  <div
+                                      className={`absolute top-0 left-0 h-full transition-all duration-500 ease-out ${isCapped ? 'bg-yellow-500' : 'bg-emerald-600'}`}
+                                      style={{width: `${(currentValue / 99) * 100}%`}}
+                                  ></div>
+                                  {isProjected && (
+                                      <div
+                                          className="absolute top-0 h-full bg-emerald-400/50 transition-all duration-300 animate-pulse"
+                                          style={{
+                                              left: `${(currentValue / 99) * 100}%`,
+                                              width: `${(1 / 99) * 100}%`
+                                          }}
+                                      ></div>
+                                  )}
+                              </div>
+
+                              {/* Train Button */}
+                              <button
+                                  onClick={() => trainAttribute(attr)}
+                                  disabled={!canAfford || isCapped}
+                                  className={`w-full py-2.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                                      isCapped
+                                          ? 'bg-slate-700 text-yellow-500 cursor-not-allowed border border-yellow-500/30'
+                                          : !canAfford
+                                              ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                              : 'bg-white hover:bg-emerald-50 text-slate-900 shadow-lg shadow-white/10'
+                                  }`}
+                              >
+                                  {isCapped ? (
+                                      <><span>🔒</span> Maxed Out</>
+                                  ) : player.energy < 10 ? (
+                                      <><span>💤</span> Too Tired</>
+                                  ) : player.skillPoints === 0 ? (
+                                      <><span>🚫</span> No SP</>
+                                  ) : (
+                                      <><span>⚡</span> Train (-10 Energy)</>
+                                  )}
+                              </button>
+                          </div>
+                      )}
                   </div>
               );
           })}

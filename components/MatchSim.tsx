@@ -181,21 +181,34 @@ const MatchSim: React.FC = () => {
         if(currentSimData) playQuarter(nextQ, currentSimData);
     } else {
         if (!currentSimData) return;
-        
+
         setLoading(true);
         commitMatchResult(currentFixtureIndex, currentSimData);
-        
-        generateMatchCommentary(
-            fixtureData.homeTeamId === myTeam.id ? myTeam : opponent, 
-            fixtureData.homeTeamId === myTeam.id ? opponent : myTeam, 
-            currentSimData, 
-            player
-        ).then(text => {
+
+        const finishMatch = (text: string) => {
+            console.log('[MatchSim] finishMatch called, simStep=5, currentSimData exists:', !!currentSimData);
             setCommentary(text);
             setSimStep(5);
             setLoading(false);
             setView('MATCH_RESULT');
+        };
+
+        generateMatchCommentary(
+            fixtureData.homeTeamId === myTeam.id ? myTeam : opponent,
+            fixtureData.homeTeamId === myTeam.id ? opponent : myTeam,
+            currentSimData,
+            player
+        )
+        .then(text => finishMatch(text))
+        .catch(err => {
+            console.error('Commentary generation failed:', err);
+            finishMatch(`Full Time: ${myTeam.name} ${currentSimData.homeScore.total} def ${opponent.name} ${currentSimData.awayScore.total}. ${player.name} had ${currentSimData.playerStats.disposals} disposals and ${currentSimData.playerStats.goals} goals.`);
         });
+
+        // Safety timeout: force show result after 10 seconds if commentary is still loading
+        setTimeout(() => {
+            finishMatch(`Full Time: ${myTeam.name} ${currentSimData.homeScore.total} def ${opponent.name} ${currentSimData.awayScore.total}.`);
+        }, 10000);
     }
   };
 
@@ -283,6 +296,17 @@ const MatchSim: React.FC = () => {
                     </div>
                 </div>
                 <div className="mt-2 text-right text-xs text-emerald-500 font-mono">{progress}%</div>
+                {/* Skip button in case commentary hangs */}
+                <button
+                    onClick={() => {
+                        setSimStep(5);
+                        setLoading(false);
+                        setView('MATCH_RESULT');
+                    }}
+                    className="mt-4 text-slate-500 text-xs underline hover:text-slate-300"
+                >
+                    Skip commentary →
+                </button>
             </div>
         </div>
       );
@@ -294,6 +318,12 @@ const MatchSim: React.FC = () => {
 
       return (
         <div className="flex flex-col h-full pb-24 bg-slate-950">
+           {/* Page Indicator Dots */}
+           <div className="flex justify-center gap-1.5 py-2 bg-slate-950">
+               <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+               <div className="w-2 h-2 rounded-full bg-slate-700"></div>
+               <div className="w-2 h-2 rounded-full bg-slate-700"></div>
+           </div>
            <div className="bg-slate-800 p-4 border-b border-slate-700 shadow-xl z-10 relative">
                 <button onClick={() => setView('DASHBOARD')} className="absolute top-4 left-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-700 text-slate-300 hover:bg-white hover:text-slate-900 transition-colors z-20">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -410,12 +440,26 @@ const MatchSim: React.FC = () => {
       );
   }
 
+  // Debug logging to understand component state
+  console.log(`[MatchSim] Render debug: simStep=${simStep}, playing=${isPlayingQuarter}, hasData=${!!currentSimData}, view=${view}, loading=${loading}`);
+
   if (simStep >= 1 && simStep <= 4 && currentSimData) {
       const myLiveScore = isHome ? liveHomeScore : liveAwayScore;
       const oppLiveScore = isHome ? liveAwayScore : liveHomeScore;
 
       return (
-        <div className="fixed inset-0 z-50 flex flex-col h-[100dvh] bg-slate-900 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex flex-col h-[100dvh] bg-slate-900 overflow-hidden" style={{ 
+            paddingTop: 'env(safe-area-inset-top)',
+            paddingBottom: 'env(safe-area-inset-bottom)',
+            paddingLeft: 'env(safe-area-inset-left)',
+            paddingRight: 'env(safe-area-inset-right)'
+        }}>
+            {/* Page Indicator Dots */}
+            <div className="flex justify-center gap-1.5 py-2 bg-slate-900">
+                <div className="w-2 h-2 rounded-full bg-slate-700"></div>
+                <div className={`w-2 h-2 rounded-full ${simStep >= 1 ? 'bg-emerald-400' : 'bg-slate-700'}`}></div>
+                <div className="w-2 h-2 rounded-full bg-slate-700"></div>
+            </div>
             <div className="flex flex-col h-full w-full max-w-md mx-auto">
                 <div className="shrink-0 p-4 pb-0">
                     <div className="flex justify-between items-center bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-xl">
@@ -435,7 +479,7 @@ const MatchSim: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <div className="flex-1 min-h-0 overflow-y-auto p-4 pt-4 space-y-3 scrollbar-hide flex flex-col-reverse">
+                <div className="flex-1 min-h-0 overflow-y-auto p-4 pt-2 space-y-3 scrollbar-hide">
                     {visibleEvents.length === 0 && isPlayingQuarter && (
                         <div className="text-center text-slate-600 italic py-10 animate-pulse">Waiting for play...</div>
                     )}
@@ -459,22 +503,26 @@ const MatchSim: React.FC = () => {
                          <div className="text-center text-slate-500 text-xs uppercase py-4">Quarter ready to start</div>
                     )}
                 </div>
-                <div className="shrink-0 p-4 pt-0 bg-slate-900">
-                    <button onClick={handleNextQuarter} disabled={isPlayingQuarter} className={`w-full py-4 font-black text-xl rounded-xl uppercase tracking-widest transition-all shadow-lg ${isPlayingQuarter ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-white text-slate-900 hover:bg-emerald-50 active:scale-95'}`}>{isPlayingQuarter ? "Playing..." : simStep === 4 ? "Final Siren" : "Play Next Quarter"}</button>
+                <div className="shrink-0 p-4 bg-slate-900 border-t border-slate-800 mt-auto">
+                    <button onClick={handleNextQuarter} disabled={isPlayingQuarter} className={`w-full py-4 font-black text-xl rounded-xl uppercase tracking-widest transition-all shadow-lg ${isPlayingQuarter ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-white text-slate-900 hover:bg-emerald-50 active:scale-95'}`} style={{ minHeight: '3rem' }}>
+                        {isPlayingQuarter ? "Playing..." : simStep === 4 ? "Final Siren" : "Play Next Quarter"}
+                    </button>
                 </div>
             </div>
         </div>
       );
   }
 
-  if (simStep === 5 && lastMatchResult) {
-      const myScore = isHome ? lastMatchResult.homeScore : lastMatchResult.awayScore;
-      const oppScore = isHome ? lastMatchResult.awayScore : lastMatchResult.homeScore;
+  if (simStep === 5 && currentSimData) {
+      console.log('[MatchSim] Rendering result screen, simStep:', simStep, 'currentSimData:', !!currentSimData, 'lastMatchResult:', !!lastMatchResult);
+      const resultData = lastMatchResult || currentSimData;
+      const myScore = isHome ? resultData.homeScore : resultData.awayScore;
+      const oppScore = isHome ? resultData.awayScore : resultData.homeScore;
       const won = myScore.total > oppScore.total;
 
       // Quarter / worm derived data
-      const homeQ = lastMatchResult.homeScore.quarters;
-      const awayQ = lastMatchResult.awayScore.quarters;
+      const homeQ = resultData.homeScore.quarters;
+      const awayQ = resultData.awayScore.quarters;
       const hasQuarterData = homeQ.length === 4 && awayQ.length === 4;
       const myQCum  = isHome ? homeQ : awayQ;
       const oppQCum = isHome ? awayQ : homeQ;
@@ -487,8 +535,8 @@ const MatchSim: React.FC = () => {
       const wy = (m: number) => 60 - Math.max(-45, Math.min(45, m * yScale));
       const wx = (i: number) => 30 + i * 60;
 
-      const allPerformers = lastMatchResult.topPerformers || [];
-      
+      const allPerformers = resultData.topPerformers || [];
+
       const homePerformers = allPerformers.filter(p => p.teamId === homeTeam.id);
       const awayPerformers = allPerformers.filter(p => p.teamId === awayTeam.id);
 
@@ -500,7 +548,13 @@ const MatchSim: React.FC = () => {
 
       return (
           <div className="p-4 pb-24 h-full flex flex-col">
-              
+              {/* Page Indicator Dots */}
+              <div className="flex justify-center gap-1.5 py-2 -mt-4">
+                  <div className="w-2 h-2 rounded-full bg-slate-700"></div>
+                  <div className="w-2 h-2 rounded-full bg-slate-700"></div>
+                  <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+              </div>
+
               {resultPage === 1 && (
                   <div className="animate-fade-in flex flex-col h-full">
                       <div className={`rounded-xl p-6 text-center mb-6 border-2 ${won ? 'bg-emerald-900/20 border-emerald-500' : 'bg-red-900/20 border-red-500'}`}>
@@ -580,8 +634,8 @@ const MatchSim: React.FC = () => {
                                       <div className="text-center">Total</div>
                                   </div>
                                   {[
-                                      { team: homeTeam, qArr: homeQ, score: lastMatchResult.homeScore },
-                                      { team: awayTeam, qArr: awayQ, score: lastMatchResult.awayScore },
+                                      { team: homeTeam, qArr: homeQ, score: resultData.homeScore },
+                                      { team: awayTeam, qArr: awayQ, score: resultData.awayScore },
                                   ].map(({ team, qArr, score }) => (
                                       <div key={team.id}
                                           className={`grid grid-cols-7 items-center px-3 py-3 border-b border-slate-700/30 last:border-0 ${team.id === myTeam.id ? 'bg-emerald-900/10' : ''}`}
@@ -682,7 +736,7 @@ const MatchSim: React.FC = () => {
 
                       {activeResultTab === 'highlights' ? (
                           <div className="flex-1 overflow-y-auto space-y-3 mb-4">
-                              {(lastMatchResult.highlights && lastMatchResult.highlights.length > 0) ? lastMatchResult.highlights.map((h, i) => {
+                              {(resultData.highlights && resultData.highlights.length > 0) ? resultData.highlights.map((h, i) => {
                                   const icons: Record<string, string> = {
                                       GOAL: '⚽', MARK: '🙌', TACKLE: '💪', DISPOSAL: '🏉', INJURY: '🤕',
                                       RIVALRY: '🤬', ONE_ON_ONE: '⚡', ONE_ON_ONE_DEFENSIVE: '🛡️',
@@ -714,24 +768,139 @@ const MatchSim: React.FC = () => {
                                    <Avatar avatar={player.avatar} teamColors={myTeam.colors} className="w-full h-full" />
                                </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-6">
+
+                          {/* Performance Grade */}
+                          {resultData.playerStats.performanceGrade && (
+                              <div className="text-center mb-4">
+                                  <div className={`inline-block px-6 py-2 rounded-xl border-2 text-4xl font-black ${
+                                      resultData.playerStats.performanceGrade.startsWith('A')
+                                          ? 'border-emerald-500 bg-emerald-900/30 text-emerald-400'
+                                          : resultData.playerStats.performanceGrade.startsWith('B')
+                                          ? 'border-blue-500 bg-blue-900/30 text-blue-400'
+                                          : resultData.playerStats.performanceGrade.startsWith('C')
+                                          ? 'border-yellow-500 bg-yellow-900/30 text-yellow-400'
+                                          : 'border-red-500 bg-red-900/30 text-red-400'
+                                  }`}>
+                                      {resultData.playerStats.performanceGrade}
+                                  </div>
+                                  <div className="text-slate-500 text-xs uppercase font-bold mt-1">Performance Grade</div>
+                              </div>
+                          )}
+
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                              {/* Core Stats */}
                               <div className="bg-slate-900/50 p-3 rounded-lg text-center border border-slate-700/50">
-                                  <div className="text-3xl font-black text-white">{lastMatchResult.playerStats.disposals}</div>
+                                  <div className="text-3xl font-black text-white">{resultData.playerStats.disposals}</div>
                                   <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Disposals</div>
                               </div>
                               <div className="bg-slate-900/50 p-3 rounded-lg text-center border border-slate-700/50">
-                                  <div className="text-3xl font-black text-white">{lastMatchResult.playerStats.goals}.{lastMatchResult.playerStats.behinds}</div>
+                                  <div className="text-3xl font-black text-white">{resultData.playerStats.goals}.{resultData.playerStats.behinds}</div>
                                   <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Score</div>
                               </div>
                               <div className="bg-slate-900/50 p-3 rounded-lg text-center border border-slate-700/50">
-                                  <div className="text-3xl font-black text-white">{lastMatchResult.playerStats.tackles}</div>
+                                  <div className="text-3xl font-black text-white">{resultData.playerStats.tackles}</div>
                                   <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Tackles</div>
                               </div>
-                               <div className={`bg-slate-900/50 p-3 rounded-lg text-center border ${lastMatchResult.playerStats.votes > 0 ? 'border-yellow-500/50 bg-yellow-900/10' : 'border-slate-700/50'}`}>
-                                  <div className={`text-3xl font-black ${lastMatchResult.playerStats.votes > 0 ? 'text-yellow-400' : 'text-slate-600'}`}>{lastMatchResult.playerStats.votes}</div>
-                                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Votes</div>
+                               <div className={`bg-slate-900/50 p-3 rounded-lg text-center border ${resultData.playerStats.votes > 0 ? 'border-yellow-500/50 bg-yellow-900/10' : 'border-slate-700/50'}`}>
+                                  <div className={`text-3xl font-black ${resultData.playerStats.votes > 0 ? 'text-yellow-400' : 'text-slate-600'}`}>{resultData.playerStats.votes}</div>
+                                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Brownlow Votes</div>
                               </div>
                           </div>
+
+                          {/* Brownlow Vote Breakdown */}
+                          {(resultData.playerStats.brownlowVotes3 || resultData.playerStats.brownlowVotes2 || resultData.playerStats.brownlowVotes1) && (
+                              <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-4">
+                                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-2 text-center">Vote Breakdown</div>
+                                  <div className="flex justify-center gap-6">
+                                      {resultData.playerStats.brownlowVotes3 ? (
+                                          <div className="text-center">
+                                              <div className="text-2xl font-black text-yellow-400">3</div>
+                                              <div className="text-[9px] text-slate-500 uppercase">Best on Ground</div>
+                                          </div>
+                                      ) : null}
+                                      {resultData.playerStats.brownlowVotes2 ? (
+                                          <div className="text-center">
+                                              <div className="text-2xl font-black text-blue-400">2</div>
+                                              <div className="text-[9px] text-slate-500 uppercase">Second Place</div>
+                                          </div>
+                                      ) : null}
+                                      {resultData.playerStats.brownlowVotes1 ? (
+                                          <div className="text-center">
+                                              <div className="text-2xl font-black text-slate-400">1</div>
+                                              <div className="text-[9px] text-slate-500 uppercase">Third Place</div>
+                                          </div>
+                                      ) : null}
+                                  </div>
+                              </div>
+                          )}
+
+                          {/* Extended Stats Grid */}
+                          <div className="bg-slate-900/30 p-3 rounded-lg border border-slate-700/30 mb-2">
+                              <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-2 text-center">Extended Stats</div>
+                              <div className="grid grid-cols-3 gap-3">
+                                  <div className="text-center">
+                                      <div className="text-lg font-bold text-blue-400">{resultData.playerStats.kicks || 0}</div>
+                                      <div className="text-[9px] text-slate-500 uppercase">Kicks</div>
+                                  </div>
+                                  <div className="text-center">
+                                      <div className="text-lg font-bold text-green-400">{resultData.playerStats.handballs || 0}</div>
+                                      <div className="text-[9px] text-slate-500 uppercase">Handballs</div>
+                                  </div>
+                                  <div className="text-center">
+                                      <div className="text-lg font-bold text-purple-400">{resultData.playerStats.marks || 0}</div>
+                                      <div className="text-[9px] text-slate-500 uppercase">Marks</div>
+                                  </div>
+                                  <div className="text-center">
+                                      <div className="text-lg font-bold text-orange-400">{resultData.playerStats.contendedPossessions || 0}</div>
+                                      <div className="text-[9px] text-slate-500 uppercase">Contended</div>
+                                  </div>
+                                  <div className="text-center">
+                                      <div className="text-lg font-bold text-teal-400">{resultData.playerStats.clearances || 0}</div>
+                                      <div className="text-[9px] text-slate-500 uppercase">Clearances</div>
+                                  </div>
+                                  <div className="text-center">
+                                      <div className="text-lg font-bold text-pink-400">{resultData.playerStats.inside50s || 0}</div>
+                                      <div className="text-[9px] text-slate-500 uppercase">Inside 50</div>
+                                  </div>
+                              </div>
+                          </div>
+
+                          {/* Disposal Effectiveness Bar */}
+                          {(() => {
+                              const eff = resultData.playerStats.effectiveDisposals || 0;
+                              const ineff = resultData.playerStats.ineffectiveDisposals || 0;
+                              const total = eff + ineff;
+                              if (total === 0) return null;
+                              const pct = Math.round((eff / total) * 100);
+                              return (
+                                  <div className="bg-slate-900/30 p-3 rounded-lg border border-slate-700/30">
+                                      <div className="flex justify-between text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                          <span>Disposal Efficiency</span>
+                                          <span className={pct > 70 ? 'text-emerald-400' : pct > 50 ? 'text-yellow-400' : 'text-red-400'}>{pct}%</span>
+                                      </div>
+                                      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                                          <div
+                                              className={`h-full rounded-full transition-all ${pct > 70 ? 'bg-emerald-500' : pct > 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                                              style={{ width: `${pct}%` }}
+                                          ></div>
+                                      </div>
+                                      <div className="flex justify-between text-[9px] text-slate-500 mt-1">
+                                          <span>{eff} effective</span>
+                                          <span>{ineff} ineffective</span>
+                                      </div>
+                                  </div>
+                              );
+                          })()}
+
+                          {/* Hit Outs for Ruck */}
+                          {(resultData.playerStats.hitOuts || 0) > 0 && (
+                              <div className="bg-slate-900/30 p-3 rounded-lg border border-slate-700/30 mt-2">
+                                  <div className="flex justify-between items-center">
+                                      <span className="text-[10px] text-slate-400 uppercase font-bold">Hit Outs</span>
+                                      <span className="text-xl font-black text-purple-400">{resultData.playerStats.hitOuts}</span>
+                                  </div>
+                              </div>
+                          )}
                       </div>
 
                       <div className="space-y-3 mb-6">
@@ -761,28 +930,28 @@ const MatchSim: React.FC = () => {
                       </div>
 
                       <div className="space-y-2 flex-1 overflow-y-auto min-h-0">
-                          {lastMatchResult.playerInjury && (
+                          {resultData.playerInjury && (
                               <div className="bg-red-900/30 border border-red-500 p-3 rounded-xl flex items-center gap-3">
                                    <div className="text-2xl">🤕</div>
                                    <div>
                                        <div className="text-red-400 font-bold text-xs uppercase">Injury Sustained</div>
-                                       <div className="text-white text-sm font-bold">{lastMatchResult.playerInjury.name}</div>
-                                       <div className="text-red-300 text-xs">{lastMatchResult.playerInjury.weeksRemaining} week recovery</div>
+                                       <div className="text-white text-sm font-bold">{resultData.playerInjury.name}</div>
+                                       <div className="text-red-300 text-xs">{resultData.playerInjury.weeksRemaining} week recovery</div>
                                    </div>
                               </div>
                           )}
 
-                          {lastMatchResult.newRivalry && (
+                          {resultData.newRivalry && (
                                <div className="bg-orange-900/30 border border-orange-500 p-3 rounded-xl flex items-center gap-3">
                                    <div className="text-2xl">🤬</div>
                                    <div>
                                        <div className="text-orange-400 font-bold text-xs uppercase">Rivalry Started</div>
-                                       <div className="text-white text-sm">vs <span className="font-bold">{lastMatchResult.newRivalry.opponentName}</span></div>
+                                       <div className="text-white text-sm">vs <span className="font-bold">{resultData.newRivalry.opponentName}</span></div>
                                    </div>
                                </div>
                           )}
                           
-                          {lastMatchResult.achievedMilestones && lastMatchResult.achievedMilestones.map((m, i) => (
+                          {resultData.achievedMilestones && resultData.achievedMilestones.map((m, i) => (
                               <div key={i} className="bg-yellow-600/20 border border-yellow-500 p-3 rounded-xl flex items-center gap-3">
                                   <div className="text-2xl">🏆</div>
                                   <div>
@@ -796,9 +965,9 @@ const MatchSim: React.FC = () => {
                       </>
                       )}
 
-                      {lastMatchResult?.tactic && lastMatchResult.tactic !== 'BALANCED' && (
+                      {resultData?.tactic && resultData.tactic !== 'BALANCED' && (
                           <div className="text-white/40 text-xs text-center mt-2">
-                              Game plan: {lastMatchResult.tactic.charAt(0) + lastMatchResult.tactic.slice(1).toLowerCase()}
+                              Game plan: {resultData.tactic.charAt(0) + resultData.tactic.slice(1).toLowerCase()}
                           </div>
                       )}
 
@@ -824,7 +993,21 @@ const MatchSim: React.FC = () => {
       );
   }
 
-  return null;
+
+
+  // Fallback: show result screen using currentSimData if we somehow got past Q4
+  if (simStep === 5 && !currentSimData) {
+      return <div className="p-8 text-center text-red-400">Error: Match data lost. <button onClick={() => advanceRound()} className="underline">Continue</button></div>;
+  }
+
+  console.warn('[MatchSim] No view matched! view:', view, 'simStep:', simStep, 'loading:', loading, 'hasCurrentSimData:', !!currentSimData);
+  return (
+      <div className="p-8 text-center text-slate-400">
+          <p>Match sequence ended unexpectedly.</p>
+          <p className="text-xs mt-2">view={view} simStep={simStep} loading={String(loading)}</p>
+          <button onClick={() => advanceRound()} className="mt-4 underline text-emerald-400">Continue Season</button>
+      </div>
+  );
 };
 
 export default MatchSim;

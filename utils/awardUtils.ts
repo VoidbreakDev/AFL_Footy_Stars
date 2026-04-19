@@ -120,23 +120,35 @@ export const calculateSeasonAwards = (
 
 /**
  * Check if player won Brownlow Medal (most votes in league)
+ * Uses 3-2-1 vote system: votes are accumulated as brownlowVotes3, brownlowVotes2, brownlowVotes1
+ * Total votes = (3pt votes) + (2pt votes) + (1pt votes) — compared by total first
  */
 const checkBrownlowMedal = (player: PlayerProfile, league: Team[]): boolean => {
-    // Player needs at least 15 votes to be competitive
-    if (player.seasonStats.votes < 15) return false;
+    // Player needs at least 10 total votes to be competitive (lowered from 15 for new system)
+    if (player.seasonStats.votes < 10) return false;
 
     // Simulate competition from other players
     // Top 3 teams will have players with strong vote counts
     const sortedTeams = [...league].sort((a, b) => b.points - a.points);
     const topTeams = sortedTeams.slice(0, 3);
 
-    // Generate simulated vote counts for top players
+    // Generate simulated vote counts for top players using 3-2-1 system
     const competitorVotes = topTeams.map(() => {
-        return Math.floor(Math.random() * 18) + 8; // 8-25 votes
+        // Simulate 3 votes (best-on-ground), 2 votes (second), 1 vote (third)
+        const threePtVotes = Math.floor(Math.random() * 6); // 0-5 best-on-ground
+        const twoPtVotes = Math.floor(Math.random() * 8); // 0-7 second place
+        const onePtVotes = Math.floor(Math.random() * 10); // 0-9 third place
+        return threePtVotes * 3 + twoPtVotes * 2 + onePtVotes * 1;
     });
 
+    // Calculate player's actual total from 3-2-1 breakdown
+    const playerTotalVotes =
+        (player.seasonStats.brownlowVotes3 || 0) * 3 +
+        (player.seasonStats.brownlowVotes2 || 0) * 2 +
+        (player.seasonStats.brownlowVotes1 || 0) * 1;
+
     // Player wins if they have more votes than all competitors
-    return competitorVotes.every(votes => player.seasonStats.votes > votes);
+    return competitorVotes.every(votes => playerTotalVotes > votes);
 };
 
 /**

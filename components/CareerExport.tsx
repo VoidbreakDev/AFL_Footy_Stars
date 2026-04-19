@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { PlayerProfile } from '../types';
+import { Share } from '@capacitor/share';
+import { Capacitor } from '@capacitor/core';
 
 interface CareerExportProps {
   player: PlayerProfile;
@@ -55,12 +57,31 @@ const CareerExport: React.FC<CareerExportProps> = ({ player, currentRound }) => 
     URL.revokeObjectURL(url);
   };
 
-  const copyCareerCard = () => {
+  const copyCareerCard = async () => {
     const card = generateCareerCard();
-    navigator.clipboard.writeText(card).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await Share.share({
+          title: `${player.name} — AFL Career`,
+          text: card,
+          dialogTitle: 'Share your career',
+        });
+      } catch (e) {
+        console.error('Share failed:', e);
+        // Fallback to clipboard
+        navigator.clipboard.writeText(card).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        });
+      }
+    } else {
+      // Browser fallback
+      navigator.clipboard.writeText(card).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }
   };
 
   return (
@@ -74,7 +95,13 @@ const CareerExport: React.FC<CareerExportProps> = ({ player, currentRound }) => 
       </button>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" style={{ 
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh'
+        }}>
           <div className="bg-slate-900 rounded-2xl border-2 border-blue-500/40 shadow-2xl max-w-sm w-full max-h-[80vh] overflow-y-auto">
             <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 text-center">
               <h3 className="text-xl font-black text-white uppercase">Export Career</h3>

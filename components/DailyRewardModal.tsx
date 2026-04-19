@@ -20,7 +20,13 @@ const DailyRewardModal: React.FC<DailyRewardModalProps> = ({
   const upcomingRewards = DAILY_REWARDS.slice(0, 7);
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" style={{ 
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh'
+    }}>
       <div className="bg-slate-900 rounded-2xl border-2 border-emerald-500 shadow-2xl max-w-md w-full overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-emerald-600 to-blue-600 p-6 text-center relative overflow-hidden">

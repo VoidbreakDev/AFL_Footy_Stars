@@ -31,7 +31,13 @@ const PostMatchPress: React.FC<PostMatchPressProps> = ({ event, onRespond, playe
   const isNegative = event.reputationImpact < 0;
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 animate-fade-in">
+    <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 animate-fade-in" style={{ 
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh'
+    }}>
       <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl shadow-2xl max-w-2xl w-full border-2 border-slate-700 flex flex-col" style={{ maxHeight: 'calc(100vh - 7rem)' }}>
         {/* Header */}
         <div className={`p-6 border-b-2 ${

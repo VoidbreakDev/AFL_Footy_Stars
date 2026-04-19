@@ -5,11 +5,48 @@ export enum Position {
   RUCK = 'Ruck',
 }
 
+export type PlayerPersonality =
+  'PROFESSIONAL' | 'FLAIR' | 'WARRIOR' | 'LEADER' | 'ENIGMA';
+
+export const PERSONALITY_DESCRIPTIONS: Record<PlayerPersonality, string> = {
+  PROFESSIONAL: 'Consistent and reliable, focuses on fundamentals',
+  FLAIR: 'Creative and unpredictable, loves the spectacular',
+  WARRIOR: 'Tough and aggressive, thrives on physical contests',
+  LEADER: 'Inspiring and vocal, lifts teammates around them',
+  ENIGMA: 'Unpredictable and mysterious, keeps opponents guessing',
+};
+
 export enum LeagueTier {
   LOCAL = 'Local League',
   STATE = 'State League',
   NATIONAL = 'AFL',
 }
+
+export type View =
+  | 'SLOT_SELECT'
+  | 'ONBOARDING'
+  | 'DASHBOARD'
+  | 'MATCH_PREVIEW'
+  | 'MATCH_SIM'
+  | 'MATCH_RESULT'
+  | 'TRAINING'
+  | 'CLUB'
+  | 'LEAGUE'
+  | 'PLAYER'
+  | 'ACHIEVEMENTS'
+  | 'MILESTONES'
+  | 'PLAYER_COMPARISON'
+  | 'TRANSFER_MARKET'
+  | 'SHOP'
+  | 'SETTINGS'
+  | 'CAREER_SUMMARY'
+  | 'DRAFT'
+  | 'MEDIA_HUB'
+  | 'CAREER_EVENTS'
+  | 'TEAM_CHEMISTRY'
+  | 'COACHING_STAFF'
+  | 'MASTER_SKILLS'
+  | 'HUB';
 
 export interface PlayerAttributes {
   kicking: number;
@@ -40,6 +77,18 @@ export interface PlayerStats {
   votes: number; // Brownlow votes
   premierships: number;
   awards: string[];
+  kicks?: number;
+  handballs?: number;
+  marks?: number;
+  inside50s?: number;
+  clearances?: number;
+  hitOuts?: number;
+  brownlowVotes1?: number;
+  brownlowVotes2?: number;
+  brownlowVotes3?: number;
+  effectiveDisposals?: number;
+  contendedPossessions?: number;
+  performanceGrade?: string;
 }
 
 export interface Milestone {
@@ -114,6 +163,11 @@ export interface TransferOffer {
   expiresRound: number;
   reason: string; // Why they want you
   teamColors: [string, string];
+  isFreeAgency?: boolean;
+  performanceBonus?: number;
+  signingBonus?: number;
+  playerOption?: boolean;
+  teamOption?: boolean;
 }
 
 export interface MediaEvent {
@@ -153,6 +207,7 @@ export interface PlayerProfile {
   age: number;
   potential: number;
   attributes: PlayerAttributes;
+  personality?: PlayerPersonality;
   careerStats: PlayerStats;
   seasonStats: PlayerStats;
   milestones: Milestone[];
@@ -165,6 +220,7 @@ export interface PlayerProfile {
   energy: number;
   rivalries: Rivalry[];
   bio?: string;
+  biography?: string[]; // Dynamic biography paragraphs
   isRetired?: boolean;
 
   // New Quick Wins features
@@ -223,12 +279,59 @@ export interface PlayerProfile {
   legacyScore?: number;
   postCareerPath?: 'MEDIA' | 'AMBASSADOR' | 'COACHING';
   retirementDecisionMade?: boolean;
+  retireAtSeasonEnd?: boolean; // Untyped field for retirement decision
   farewell?: boolean;
   isCaptain?: boolean;
   captaincyYear?: number;
   lowChemistryStreak?: number;
   captainSpeechUsed?: boolean;
   leagueGender?: LeagueGender;
+
+  // Season objectives
+  seasonObjectives?: SeasonObjective[];
+
+  // Match prediction
+  matchPrediction?: MatchPrediction;
+
+  // Pre-season camp
+  preSeasonCamp?: PreSeasonCamp;
+
+  // Team selection drama
+  droppedToReserves?: boolean;
+  selectionDrama?: {
+    round: number;
+    reason: string;
+    response: null | 'TRAIN_HARDER' | 'CONFRONT_COACH' | 'MEDIA_BLITZ';
+    resolved: boolean;
+  };
+
+  // Representative football
+  representativeHonours?: {
+    team: string;
+    round: number;
+    year: number;
+    disposals: number;
+    goals: number;
+    xpEarned: number;
+  }[];
+  selectedForRep?: boolean;
+
+  // Training periodization
+  trainingFocus?: {
+    day: number;
+    focus: keyof PlayerAttributes;
+    completed: boolean;
+  }[];
+  weeklyTrainingBonus?: number;
+
+  // Story arcs
+  activeStoryArcs?: StoryArc[];
+  completedStoryArcs?: StoryArc[];
+  narrativeTags?: string[]; // Accumulated choice tags
+
+  // Media conferences
+  pendingMediaConference?: MediaConference;
+  mediaConferenceHistory?: MediaConference[];
 }
 
 export interface SeasonHistory {
@@ -381,7 +484,7 @@ export interface DraftClass {
 
 export interface CareerEvent {
   id: string;
-  type: 'PERSONAL' | 'PROFESSIONAL' | 'RIVALRY' | 'TEAMMATE' | 'INJURY' | 'FINANCIAL' | 'OPPORTUNITY' | 'CRISIS' | 'FAN_MAIL' | 'RIVALRY_EVENT';
+  type: 'PERSONAL' | 'PROFESSIONAL' | 'RIVALRY' | 'TEAMMATE' | 'INJURY' | 'FINANCIAL' | 'OPPORTUNITY' | 'CRISIS' | 'FAN_MAIL' | 'RIVALRY_EVENT' | 'COMMUNITY' | 'LOCKER_ROOM' | 'LEGACY_MOMENT' | 'MEDIA_CONFERENCE' | 'STORYLINE';
   category: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' | 'CHOICE';
   title: string;
   description: string;
@@ -432,6 +535,9 @@ export interface CareerEventEffect {
 
   // Text feedback
   resultText?: string; // Describe what happened
+
+  // Legacy score impact
+  legacyImpact?: number; // +/- to legacy score
 }
 
 export interface CareerEventChoice {
@@ -579,6 +685,7 @@ export interface CoachingStaff {
   fitnessStaff: StaffMember[];
   medicalStaff: StaffMember[];
   mentalCoach?: StaffMember;
+  staffMembers?: StaffMember[]; // For backward compatibility
 
   // Overall staff quality
   staffRating: number; // 0-100 overall staff quality
@@ -723,4 +830,134 @@ export interface RivalryEvent {
   year: number;
   description: string;
   intensityChange: number;
+}
+
+// ===== STORY ARC TYPES =====
+
+export type StoryArcType =
+  'CONTRACT_SAGA' | 'RIVALRY_ESCALATION' | 'CAPTAINCY_JOURNEY' | 'REDEMPTION_ARC' | 'MEDIA_FIRESTORM' | 'MENTOR_RELATIONSHIP' | 'SLUMP_AND_RETURN' | 'TRADE_SPECULATION' | 'LEGACY_CHASE' | 'FAREWELL_SEASON';
+
+export type StoryArcAct = 'SETUP' | 'ESCALATION' | 'RESOLUTION' | 'EPILOGUE';
+
+// ===== MEDIA CONFERENCE =====
+
+export interface MediaConference {
+  id: string;
+  type: 'MID_SEASON_CHECK' | 'CONTROVERSY_RESPONSE' | 'GRAND_FINAL_PREVIEW' | 'CAREER_MILESTONE';
+  title: string;
+  description: string;
+  round: number;
+  year: number;
+  questions: MediaConferenceQuestion[];
+  answeredQuestions?: string[]; // IDs of answered questions
+  completed: boolean;
+}
+
+export interface MediaConferenceQuestion {
+  id: string;
+  text: string;
+  tone: 'HOSTILE' | 'NEUTRAL' | 'FRIENDLY' | 'PROBING';
+}
+
+export interface MediaConferenceResponse {
+  id: string;
+  text: string;
+  tone: 'CONFIDENT' | 'HUMBLE' | 'DEFLECT' | 'CONTROVERSIAL' | 'DIPLOMATIC';
+}
+
+// ===== SEASON OBJECTIVES =====
+
+export interface SeasonObjective {
+  id: string;
+  category: 'DISPOSALS' | 'GOALS' | 'TACKLES' | 'MARKS' | 'VOTES' | 'WINS' | 'MORALE' | 'TRAINING';
+  target: number;
+  current: number;
+  reward: {
+    type: 'XP' | 'SKILL_POINTS' | 'WALLET' | 'MORALE';
+    amount: number;
+    xp?: number;
+    skillPoints?: number;
+    morale?: number;
+    wallet?: number;
+  };
+  duration: 'WEEKLY' | 'SEASON';
+  roundCreated: number;
+  expiresRound?: number;
+  completed: boolean;
+}
+
+// ===== PRE-SEASON CAMP =====
+
+export interface PreSeasonCamp {
+  id: string;
+  year: number;
+  focusAttribute: keyof PlayerAttributes;
+  trainingPartner?: {
+    name: string;
+    position: Position;
+    rating: number;
+  };
+  daysCompleted: number;
+  totalDays: number;
+  xpBonus: number;
+  attributeBonus: number;
+  completed: boolean;
+}
+
+// ===== STORY ARCS =====
+
+export interface StoryArc {
+  id: string;
+  type: StoryArcType;
+  title: string;
+  description: string;
+  synopsis?: string;
+  currentAct: StoryArcAct;
+  act: StoryArcAct;
+  currentRound: number;
+  startRound: number;
+  year: number;
+  events: StoryArcEvent[];
+  completedEvents: string[]; // IDs of completed events
+  completed: boolean;
+  active: boolean;
+  legacyImpact?: number; // Total legacy score impact
+  narrativeTags?: string[]; // Tags from choices made
+  outcome?: string;
+}
+
+export interface StoryArcEvent {
+  id: string;
+  title: string;
+  description: string;
+  act: StoryArcAct;
+  round: number;
+  icon?: string;
+  choices?: StoryArcChoice[];
+  completed: boolean;
+  choiceMade?: string;
+  outcomeText?: string;
+  resolved?: boolean;
+}
+
+export interface StoryArcChoice {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  effects: CareerEventEffect;
+  narrativeTag?: string; // Tag added to player.narrativeTags
+  risk?: 'LOW' | 'MEDIUM' | 'HIGH';
+  reputationChange?: number;
+  fanChange?: number;
+  walletChange?: number;
+}
+
+// ===== MATCH PREDICTION =====
+
+export interface MatchPrediction {
+  homeScore: number;
+  awayScore: number;
+  playerPerformance: number;
+  confidence: number;
 }

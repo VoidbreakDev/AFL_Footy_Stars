@@ -29,7 +29,13 @@ const DerbyBuildup: React.FC<DerbyBuildupProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" style={{ 
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh'
+    }}>
       <div className={`bg-gradient-to-br ${getIntensityColor()} rounded-2xl p-1 shadow-2xl max-w-sm w-full`}>
         <div className="bg-slate-900/95 rounded-xl p-6 text-center">
           {/* Derby Badge */}

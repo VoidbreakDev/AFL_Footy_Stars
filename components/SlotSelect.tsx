@@ -1,7 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGameContext } from '../context/GameContext';
-
-const SAVE_KEY = (slot: number) => `footyLegendSave_slot${slot}`;
+import { StorageService } from '../services/storageService';
 
 interface SlotSnapshot {
   name: string;
@@ -11,13 +10,11 @@ interface SlotSnapshot {
   tier: string;
 }
 
-const getSlotSnapshot = (slot: number): SlotSnapshot | null => {
+const getSlotSnapshot = async (slot: number): Promise<SlotSnapshot | null> => {
   try {
-    const raw = localStorage.getItem(SAVE_KEY(slot));
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    const p = data.player;
-    if (!p) return null;
+    const data = await StorageService.load(slot);
+    if (!data || !(data as any).player) return null;
+    const p = (data as any).player;
     return {
       name: p.name ?? 'Unknown',
       club: p.contract?.clubName ?? 'Unknown',
@@ -32,17 +29,47 @@ const getSlotSnapshot = (slot: number): SlotSnapshot | null => {
 
 const SlotSelect: React.FC = () => {
   const { setCurrentSlot, loadGame, setView } = useGameContext();
+  const [slots, setSlots] = useState<{slot: number; snapshot: SlotSnapshot | null}[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleSelectSlot = (slot: number) => {
+  useEffect(() => {
+    const loadSlots = async () => {
+      try {
+        const slotData = await Promise.all([0, 1, 2].map(async (slot) => ({
+          slot,
+          snapshot: await getSlotSnapshot(slot)
+        })));
+        setSlots(slotData);
+      } catch (e) {
+        console.error('Failed to load slot data:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSlots();
+  }, []);
+
+  const handleSelectSlot = async (slot: number) => {
     setCurrentSlot(slot);
-    const hasSave = !!localStorage.getItem(SAVE_KEY(slot));
-    if (hasSave) {
+    const snapshot = slots.find(s => s.slot === slot)?.snapshot;
+    if (snapshot) {
       // Pass slot directly — avoids stale closure on currentSlot state
-      loadGame(slot);
+      await loadGame(slot);
     } else {
       setView('ONBOARDING');
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-green-700 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="text-2xl mb-4">🏈</div>
+          <div className="text-lg">Loading careers...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-green-700 flex flex-col items-center justify-center p-6">
@@ -53,23 +80,22 @@ const SlotSelect: React.FC = () => {
       </div>
 
       <div className="flex flex-col gap-4 w-full max-w-sm">
-        {[0, 1, 2].map(slot => {
-          const snap = getSlotSnapshot(slot);
+        {slots.map(({ slot, snapshot }) => {
           return (
             <button
               key={slot}
               onClick={() => handleSelectSlot(slot)}
               className="bg-white/10 hover:bg-white/20 active:bg-white/30 border border-white/20 rounded-2xl p-5 text-left transition-all shadow-lg"
             >
-              {snap ? (
+              {snapshot ? (
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-black text-lg shrink-0">
-                    {snap.name.charAt(0)}
+                    {snapshot.name.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-white font-bold truncate">{snap.name}</div>
-                    <div className="text-green-200 text-sm">{snap.club} · Age {snap.age} · Lvl {snap.level}</div>
-                    <div className="text-green-400 text-xs mt-0.5">{snap.tier} · Career {slot + 1}</div>
+                    <div className="text-white font-bold truncate">{snapshot.name}</div>
+                    <div className="text-green-200 text-sm">{snapshot.club} · Age {snapshot.age} · Lvl {snapshot.level}</div>
+                    <div className="text-green-400 text-xs mt-0.5">{snapshot.tier} · Career {slot + 1}</div>
                   </div>
                   <div className="text-green-300 text-xl">▶</div>
                 </div>

@@ -1,5 +1,5 @@
 
-import { MatchResult, MatchEvent, Team, PlayerProfile, Rivalry, PlayerInjury, PerformerStats, Position, Tactic, CultureType } from '../types';
+import { MatchResult, MatchEvent, Team, PlayerProfile, Rivalry, PlayerInjury, PerformerStats, Position, Tactic, CultureType, PlayerPersonality } from '../types';
 
 export const INJURY_TYPES = [
   { name: "Hamstring Strain", weeks: 2 },
@@ -101,16 +101,36 @@ const CROWD_PHRASES_BY_CULTURE: Partial<Record<CultureType, string[]>> = {
     ],
 };
 
-// --- HELPER: Simulate CPU Match ---
+// --- HELPER: Simulate CPU Match with realistic scoring ---
 export const simulateCPUMatch = (homeTeam: Team, awayTeam: Team): MatchResult => {
-    const homeGoals = Math.floor(Math.random() * 15) + 5;
-    const homeBehinds = Math.floor(Math.random() * 10);
-    const awayGoals = Math.floor(Math.random() * 15) + 5;
-    const awayBehinds = Math.floor(Math.random() * 10);
-    
+    // Calculate team rating differential to influence scoring
+    const homeRating = homeTeam.players.reduce((sum, p) => sum + p.rating, 0) / Math.max(1, homeTeam.players.length);
+    const awayRating = awayTeam.players.reduce((sum, p) => sum + p.rating, 0) / Math.max(1, awayTeam.players.length);
+    const ratingDiff = homeRating - awayRating;
+
+    // Use normal-ish distribution via sum of randoms (Central Limit Theorem approximation)
+    // Typical AFL scores: 70-110 total, ~10-16 goals, 8-14 behinds
+    const randomNormal = (mean: number, std: number): number => {
+        let sum = 0;
+        for (let i = 0; i < 6; i++) sum += Math.random();
+        return Math.round(mean + (sum - 3) * std);
+    };
+
+    // Base goals: mean ~12, std ~3 (range roughly 5-20)
+    // Rating differential shifts the mean by ~0.3 goals per point of rating diff
+    const homeGoalMean = 12 + ratingDiff * 0.3;
+    const awayGoalMean = 12 - ratingDiff * 0.3;
+
+    const homeGoals = Math.max(2, randomNormal(homeGoalMean, 3));
+    const awayGoals = Math.max(2, randomNormal(awayGoalMean, 3));
+
+    // Behinds: mean ~8, std ~3 (roughly 0.6-0.8 behinds per goal, realistic AFL ratio)
+    const homeBehinds = Math.max(1, randomNormal(8 + homeGoals * 0.3, 3));
+    const awayBehinds = Math.max(1, randomNormal(8 + awayGoals * 0.3, 3));
+
     const hTotal = homeGoals * 6 + homeBehinds;
     const aTotal = awayGoals * 6 + awayBehinds;
-    
+
     return {
         homeScore: { goals: homeGoals, behinds: homeBehinds, total: hTotal, quarters: [] },
         awayScore: { goals: awayGoals, behinds: awayBehinds, total: aTotal, quarters: [] },
@@ -164,12 +184,86 @@ export const calculateMatchOutcome = (
       if (player.morale > 80) moraleMultiplier = 1.1;
       else if (player.morale < 40) moraleMultiplier = 0.85;
 
+      // -- 0.5 PERSONALITY MODIFIER --
+      const personality = player.personality as PlayerPersonality | undefined;
+      let personalityInjuryMod = 0; // Negative = reduced injury risk
+      let consistencyMod = 0; // How much variance in performance
+      let tacklingBonus = 0;
+      let bigGameBonus = 0; // Bonus in important matches
+      let energyDrainMod = 0; // Extra energy drain
+
+      switch (personality) {
+          case 'PROFESSIONAL':
+              consistencyMod = 0.8; // More consistent (reduces variance)
+              personalityInjuryMod = -0.005; // Lower injury risk
+              break;
+          case 'FLAIR':
+              consistencyMod = 1.3; // More variance (brilliant or poor)
+              personalityInjuryMod = 0.008; // Higher injury risk
+              break;
+          case 'WARRIOR':
+              tacklingBonus = 2; // Extra tackles per game
+              bigGameBonus = 1; // Better in big games
+              energyDrainMod = 3; // Uses more energy
+              break;
+          case 'LEADER':
+              bigGameBonus = 1;
+              consistencyMod = 0.9;
+              break;
+          case 'ENIGMA':
+              consistencyMod = 1.5; // Maximum variance
+              break;
+          default:
+              break;
+      }
+
+      // -- 0.6 MATCH-DAY PRESSURE SYSTEM --
+      // Identify if this is a high-pressure match
+      let pressureLevel = 0; // 0 = normal, 1 = elevated, 2 = high, 3 = extreme
+      const isFinals = currentRound > 14;
+      const isGrandFinal = currentRound === 16;
+      const isDerby = player.rivalries?.some(r => r.club === (isHome ? awayTeam.name : homeTeam.name));
+      const isReturnFromInjury = player.injury && player.injury.weeksRemaining === 1;
+
+      if (isGrandFinal) pressureLevel = 3;
+      else if (isFinals) pressureLevel = 2;
+      else if (isDerby) pressureLevel = 2;
+      else if (isReturnFromInjury) pressureLevel = 1;
+
+      // Pressure affects performance based on personality
+      // LEADER and PROFESSIONAL handle pressure well; FLAIR and ENIGMA struggle
+      let pressureModifier = 0;
+      if (pressureLevel > 0) {
+          const pressureWeight = pressureLevel * 0.03; // 3% per level
+          switch (personality) {
+              case 'LEADER':
+                  pressureModifier = pressureWeight * 1.5; // Thrives under pressure
+                  break;
+              case 'PROFESSIONAL':
+                  pressureModifier = pressureWeight * 0.5; // Slight boost
+                  break;
+              case 'WARRIOR':
+                  pressureModifier = pressureWeight * (bigGameBonus > 0 ? 1.2 : 0.3);
+                  break;
+              case 'FLAIR':
+                  pressureModifier = -pressureWeight * 0.8; // Struggles under pressure
+                  break;
+              case 'ENIGMA':
+                  // 50/50 — either brilliant or terrible
+                  pressureModifier = Math.random() > 0.5 ? pressureWeight * 1.5 : -pressureWeight * 1.5;
+                  break;
+              default:
+                  pressureModifier = -pressureWeight * 0.3; // Average player slightly shrinks
+                  break;
+          }
+      }
+
       // -- 1. INJURY CHECK --
       let injuryData: PlayerInjury | undefined = undefined;
       let injuryQuarter = 0; // 0 = No injury
       
-      // Base chance of injury (e.g., 1.5%). Higher if low stamina/high tackles
-      const injuryChance = 0.015; 
+      // Base chance of injury (e.g., 1.5%). Modified by personality.
+      const injuryChance = 0.015 + personalityInjuryMod;
       if (Math.random() < injuryChance) {
           const type = INJURY_TYPES[Math.floor(Math.random() * INJURY_TYPES.length)];
           injuryData = {
@@ -182,17 +276,24 @@ export const calculateMatchOutcome = (
       // -- 2. DECIDE PLAYER STATS FIRST --
       // Base Calculations
       let pDisposalsRaw = Math.floor(Math.random() * 15) + (player.attributes.stamina / 8) + (player.attributes.speed / 8) + (player.attributes.handball / 10);
-      let pGoalsRaw = player.position === Position.FORWARD 
+      let pGoalsRaw = player.position === Position.FORWARD
           ? Math.floor(Math.random() * 4) + (player.attributes.kicking > 50 ? 1 : 0) + (player.attributes.goalSense / 20)
           : Math.floor(Math.random() * 1.5) + (player.attributes.goalSense / 40);
       let pBehindsRaw = Math.floor(Math.random() * 3);
-      let pTacklesRaw = Math.floor(Math.random() * 4) + (player.attributes.tackling / 10);
+      let pTacklesRaw = Math.floor(Math.random() * 4) + (player.attributes.tackling / 10) + tacklingBonus;
+
+      // Apply consistency modifier (reduces or increases variance from random)
+      if (consistencyMod !== 0) {
+          const baseVariance = 7.5; // Half of Math.random() * 15
+          const disposalsVariance = baseVariance * consistencyMod;
+          pDisposalsRaw = Math.floor(Math.random() * disposalsVariance * 2) + (player.attributes.stamina / 8) + (player.attributes.speed / 8) + (player.attributes.handball / 10);
+      }
 
       // Apply Morale Multiplier
-      let pDisposals = Math.floor(pDisposalsRaw * moraleMultiplier);
-      let pGoals = Math.floor(pGoalsRaw * moraleMultiplier);
+      let pDisposals = Math.floor(pDisposalsRaw * (moraleMultiplier + pressureModifier));
+      let pGoals = Math.floor(pGoalsRaw * (moraleMultiplier + pressureModifier));
       let pBehinds = Math.floor(pBehindsRaw);
-      let pTackles = Math.floor(pTacklesRaw * moraleMultiplier);
+      let pTackles = Math.floor(pTacklesRaw * (moraleMultiplier + pressureModifier));
 
       // Apply tactic scoring bonus/penalty to player goals
       if (playerScoringBonus !== 0) {
@@ -213,7 +314,20 @@ export const calculateMatchOutcome = (
           goals: Math.floor(pGoals),
           behinds: pBehinds,
           tackles: Math.floor(pTackles),
-          votes: (injuryQuarter === 0) && (pDisposals > 25 || Math.floor(pGoals) > 3) ? 3 : 0
+          votes: 0, // Will be calculated in Brownlow 3-2-1 system
+          // Extended stats
+          effectiveDisposals: 0,
+          ineffectiveDisposals: 0,
+          kicks: 0,
+          handballs: 0,
+          marks: 0,
+          contendedPossessions: 0,
+          inside50s: 0,
+          clearances: 0,
+          hitOuts: 0,
+          brownlowVotes3: 0,
+          brownlowVotes2: 0,
+          brownlowVotes1: 0,
       };
 
       let timeline: MatchEvent[] = [];
@@ -230,6 +344,13 @@ export const calculateMatchOutcome = (
       let remainingPlayerBehinds = pStats.behinds;
       let remainingPlayerDisposals = pStats.disposals;
       let remainingPlayerTackles = pStats.tackles;
+
+      // -- MOMENTUM SYSTEM --
+      // Tracks which team is "on top" — consecutive scoring events build momentum
+      // Momentum affects scoring probability for the next quarter
+      let homeMomentum = 0; // -10 to +10, positive = home advantage
+      let homeConsecutiveScores = 0;
+      let awayConsecutiveScores = 0;
 
       // -- 3. GENERATE QUARTER BY QUARTER --
       for(let q=1; q<=4; q++) {
@@ -275,17 +396,53 @@ export const calculateMatchOutcome = (
               for(let i=0; i<qPlayerGoals; i++) {
                   events.push({ quarter: q, time: `${Math.floor(Math.random()*minutes)+1}:00`, description: `${player.name} ${PHRASES.GOAL[Math.floor(Math.random()*PHRASES.GOAL.length)]}`, type: 'GOAL', isPlayerInvolved: true, teamId: playerTeamId });
                   if(isHome) homeGoals++; else awayGoals++;
+                  // Goals count as effective disposal
+                  pStats.effectiveDisposals++;
+                  pStats.inside50s++;
               }
               for(let i=0; i<qPlayerBehinds; i++) {
                 events.push({ quarter: q, time: `${Math.floor(Math.random()*minutes)+1}:00`, description: `${player.name} ${PHRASES.BEHIND[Math.floor(Math.random()*PHRASES.BEHIND.length)]}`, type: 'BEHIND', isPlayerInvolved: true, teamId: playerTeamId });
                 if(isHome) homeBehinds++; else awayBehinds++;
+                pStats.inside50s++;
               }
               for(let i=0; i<qKeyDisposals; i++) {
                 events.push({ quarter: q, time: `${Math.floor(Math.random()*minutes)+1}:00`, description: `${player.name} ${PHRASES.POSSESSION[Math.floor(Math.random()*PHRASES.POSSESSION.length)]}`, type: 'POSSESSION', isPlayerInvolved: true, teamId: playerTeamId });
+                // Disposal effectiveness: 60-80% effective based on kicking/handball
+                const effectiveChance = (player.attributes.kicking + player.attributes.handball) / 200;
+                if (Math.random() < effectiveChance) {
+                    pStats.effectiveDisposals++;
+                } else {
+                    pStats.ineffectiveDisposals++;
+                }
+                // Split between kicks and handballs
+                if (Math.random() < 0.6) {
+                    pStats.kicks++;
+                } else {
+                    pStats.handballs++;
+                }
               }
               for(let i=0; i<qTackles; i++) {
                 events.push({ quarter: q, time: `${Math.floor(Math.random()*minutes)+1}:00`, description: `${player.name} ${PHRASES.TACKLE[Math.floor(Math.random()*PHRASES.TACKLE.length)]}`, type: 'TACKLE', isPlayerInvolved: true, teamId: playerTeamId });
+                pStats.contendedPossessions++;
               }
+
+              // Track marks from position-specific events
+              if (player.position === Position.FORWARD || player.position === Position.MIDFIELDER) {
+                  const markChance = player.attributes.marking / 150;
+                  if (Math.random() < markChance) {
+                      pStats.marks++;
+                      events.push({ quarter: q, time: `${Math.floor(Math.random()*minutes)+1}:00`, description: `${player.name} takes a contested mark!`, type: 'MARK', isPlayerInvolved: true, teamId: playerTeamId });
+                  }
+              } else if (player.position === Position.DEFENDER) {
+                  const markChance = player.attributes.marking / 120; // Defenders mark more
+                  if (Math.random() < markChance) {
+                      pStats.marks++;
+                      events.push({ quarter: q, time: `${Math.floor(Math.random()*minutes)+1}:00`, description: `${player.name} intercepts with a mark!`, type: 'MARK', isPlayerInvolved: true, teamId: playerTeamId });
+                  }
+              }
+
+              // Clearances from stoppages (roughly 30% of disposals)
+              pStats.clearances = Math.floor(qDisposals * 0.3);
 
               // INJURY EVENT
               if (injuryQuarter === q && injuryData) {
@@ -322,6 +479,7 @@ export const calculateMatchOutcome = (
                           const roll = (player.attributes.stamina + player.attributes.marking) / 200;
                           if (Math.random() < roll) {
                               events.push({ quarter: q, time: `${Math.floor(Math.random()*minutes)+1}:00`, description: `${player.name} ${PHRASES.HIT_OUT[Math.floor(Math.random()*PHRASES.HIT_OUT.length)]}`, type: 'HIT_OUT', isPlayerInvolved: true, teamId: playerTeamId });
+                              pStats.hitOuts += Math.floor(Math.random() * 5) + 8; // 8-12 hit outs per quarter
                           }
                           break;
                       }
@@ -332,7 +490,7 @@ export const calculateMatchOutcome = (
           }
 
           // Per-quarter energy cost (applies regardless of active/injured)
-          const quarterCost = Math.max(0, (10 + Math.floor(Math.random() * 11)) + extraEnergyCost);
+          const quarterCost = Math.max(0, (10 + Math.floor(Math.random() * 11)) + extraEnergyCost + Math.floor(energyDrainMod / 4));
           inMatchEnergy = Math.max(0, inMatchEnergy - quarterCost);
           totalEnergyUsed += quarterCost;
 
@@ -358,10 +516,20 @@ export const calculateMatchOutcome = (
               const goalThreshold = isOpponentEvent
                   ? Math.max(0.05, 0.25 * (1 - opponentScoringPenalty))
                   : 0.25;
-              if (typeRoll < goalThreshold) {
+
+              // Apply momentum bonus/penalty to scoring (±5% based on momentum)
+              const momentumAdjustment = (homeMomentum * 0.005); // ±0.05 max
+              const adjustedGoalThreshold = isHomeEvent
+                  ? goalThreshold + momentumAdjustment
+                  : goalThreshold - momentumAdjustment;
+
+              if (typeRoll < adjustedGoalThreshold) {
                   type = 'GOAL';
                   desc = `${actorName} ${PHRASES.GOAL[Math.floor(Math.random()*PHRASES.GOAL.length)]}`;
                   if(isHomeEvent) homeGoals++; else awayGoals++;
+                  // Build momentum for scoring team
+                  if (isHomeEvent) { homeConsecutiveScores++; awayConsecutiveScores = 0; }
+                  else { awayConsecutiveScores++; homeConsecutiveScores = 0; }
               } else if (typeRoll < 0.4) {
                   type = 'BEHIND';
                   desc = `${actorName} ${PHRASES.BEHIND[Math.floor(Math.random()*PHRASES.BEHIND.length)]}`;
@@ -408,6 +576,41 @@ export const calculateMatchOutcome = (
           // Sort events by time
           events.sort((a,b) => parseInt(a.time) - parseInt(b.time));
           timeline = [...timeline, ...events];
+
+          // -- END OF QUARTER MOMENTUM CALCULATION --
+          // Calculate momentum based on quarter scoring
+          const homeQGoals = events.filter(e => e.type === 'GOAL' && e.teamId === homeTeam.id).length;
+          const awayQGoals = events.filter(e => e.type === 'GOAL' && e.teamId === awayTeam.id).length;
+          const qGoalDiff = homeQGoals - awayQGoals;
+
+          // Momentum shifts based on quarter performance + consecutive scores
+          const consecutiveBonus = Math.max(homeConsecutiveScores, awayConsecutiveScores) * 0.5;
+          if (homeConsecutiveScores > awayConsecutiveScores) {
+              homeMomentum = Math.min(10, homeMomentum + qGoalDiff * 0.8 + consecutiveBonus);
+          } else if (awayConsecutiveScores > homeConsecutiveScores) {
+              homeMomentum = Math.max(-10, homeMomentum + qGoalDiff * 0.8 - consecutiveBonus);
+          } else {
+              homeMomentum = Math.max(-10, Math.min(10, homeMomentum + qGoalDiff * 0.8));
+          }
+
+          // Decay momentum slightly each quarter (regression to mean)
+          homeMomentum *= 0.85;
+
+          // Add crowd momentum phrase if significant
+          if (Math.abs(homeMomentum) > 4 && playerTeamCulture) {
+              const crowdPhrases = CROWD_PHRASES_BY_CULTURE[playerTeamCulture] || PHRASES.GENERIC;
+              const momentumPhrase = homeMomentum > 0
+                  ? crowdPhrases[Math.floor(Math.random() * crowdPhrases.length)]
+                  : 'The momentum has swung against them.';
+              timeline.push({
+                  quarter: q,
+                  time: '20:00',
+                  description: momentumPhrase,
+                  type: 'GENERIC',
+                  isPlayerInvolved: false,
+                  teamId: playerTeamId
+              });
+          }
       }
 
       // Calculate quarter-by-quarter scores from timeline events
@@ -509,7 +712,7 @@ export const calculateMatchOutcome = (
           return distribution;
       };
 
-      // Add 4 UNIQUE teammates (shuffle then slice avoids duplicates)
+      // Add 4 UNIQUE teammates with stats based on their actual ratings
       const allTeammates = isHome ? homeTeam.players : awayTeam.players;
       const filteredTeammates = allTeammates.filter(p => p.name !== player.name);
       const pickedTeammates = shuffle(filteredTeammates).slice(0, 4);
@@ -517,16 +720,21 @@ export const calculateMatchOutcome = (
       const teamGoalDist = distributeGoals(teamBudget, pickedTeammates.length);
 
       pickedTeammates.forEach((p, i) => {
+          // Generate disposals based on player rating (higher rated = more disposals)
+          const baseDisposals = Math.floor(Math.random() * 10) + 12; // 12-21
+          const ratingBonus = Math.floor((p.rating - 50) / 10); // -3 to +4 based on rating
+          const teammateDisposals = Math.max(5, baseDisposals + ratingBonus);
+
           topPerformers.push({
               name: p.name,
               teamId: playerTeamId,
               goals: teamGoalDist[i],
-              disposals: Math.floor(Math.random() * 20) + 12,
+              disposals: teammateDisposals,
               isUser: false
           });
       });
 
-      // Add 4 UNIQUE opponents
+      // Add 4 UNIQUE opponents with stats based on their actual ratings
       const oppPlayers = isHome ? awayTeam.players : homeTeam.players;
       const oppTeamId = isHome ? awayTeam.id : homeTeam.id;
       const pickedOpps = shuffle(oppPlayers).slice(0, 4);
@@ -534,17 +742,123 @@ export const calculateMatchOutcome = (
       const oppGoalDist = distributeGoals(oppBudget, pickedOpps.length);
 
       pickedOpps.forEach((p, i) => {
+          const baseDisposals = Math.floor(Math.random() * 10) + 12;
+          const ratingBonus = Math.floor((p.rating - 50) / 10);
+          const oppDisposals = Math.max(5, baseDisposals + ratingBonus);
+
           topPerformers.push({
               name: p.name,
               teamId: oppTeamId,
               goals: oppGoalDist[i],
-              disposals: Math.floor(Math.random() * 20) + 12,
+              disposals: oppDisposals,
               isUser: false
           });
       });
 
       const hTotal = (finalHomeGoals * 6) + finalHomeBehinds;
       const aTotal = (finalAwayGoals * 6) + finalAwayBehinds;
+
+      // -- BROWNLOW 3-2-1 VOTE CALCULATION --
+      // Calculate performance score for all top performers
+      const allScores = topPerformers.map(p => {
+          // For non-user players, simulate tackles and marks based on their random disposals
+          const simTackles = p.isUser ? pStats.tackles : Math.floor(p.disposals * 0.15);
+          const simMarks = p.isUser ? (pStats.marks || 0) : Math.floor(p.disposals * 0.08);
+          const simGoals = p.goals;
+
+          return {
+              name: p.name,
+              teamId: p.teamId,
+              isUser: p.isUser,
+              // Brownlow scoring: goals=4, disposals=1, tackles=2, marks=1
+              score: simGoals * 4 + p.disposals * 1 + simTackles * 2 + simMarks * 1
+          };
+      });
+
+      // Sort by score descending
+      allScores.sort((a, b) => b.score - a.score);
+
+      // Assign 3-2-1 votes to top 3 (only if they have a positive score)
+      if (allScores.length >= 1 && allScores[0].score > 0) {
+          if (allScores[0].isUser) pStats.brownlowVotes3 = 3;
+      }
+      if (allScores.length >= 2 && allScores[1].score > 0) {
+          if (allScores[1].isUser) pStats.brownlowVotes2 = 2;
+      }
+      if (allScores.length >= 3 && allScores[2].score > 0) {
+          if (allScores[2].isUser) pStats.brownlowVotes1 = 1;
+      }
+
+      pStats.votes = pStats.brownlowVotes3 + pStats.brownlowVotes2 + pStats.brownlowVotes1;
+
+      // -- PERFORMANCE GRADE --
+      // Calculate performance grade based on position expectations
+      const getPerformanceGrade = (stats: typeof pStats, position: Position): string => {
+          let score = 0;
+          const disposals = stats.disposals;
+          const goals = stats.goals;
+          const tackles = stats.tackles;
+
+          // Base score from disposals (40% weight)
+          if (disposals >= 35) score += 40;
+          else if (disposals >= 28) score += 35;
+          else if (disposals >= 22) score += 30;
+          else if (disposals >= 18) score += 25;
+          else if (disposals >= 14) score += 20;
+          else if (disposals >= 10) score += 15;
+          else score += 10;
+
+          // Position-specific scoring
+          switch (position) {
+              case Position.FORWARD:
+                  if (goals >= 5) score += 35;
+                  else if (goals >= 3) score += 25;
+                  else if (goals >= 2) score += 15;
+                  else if (goals >= 1) score += 10;
+                  break;
+              case Position.MIDFIELDER:
+                  if (disposals >= 30) score += 20; // Already counted but bonus
+                  if (tackles >= 8) score += 20;
+                  else if (tackles >= 5) score += 15;
+                  else if (tackles >= 3) score += 10;
+                  break;
+              case Position.DEFENDER:
+                  if (tackles >= 6) score += 20;
+                  if ((stats.marks || 0) >= 4) score += 20;
+                  else if ((stats.marks || 0) >= 2) score += 10;
+                  break;
+              case Position.RUCK:
+                  if ((stats.hitOuts || 0) >= 30) score += 25;
+                  if ((stats.marks || 0) >= 3) score += 15;
+                  break;
+          }
+
+          // Brownlow bonus
+          if (stats.votes >= 3) score += 10;
+          else if (stats.votes >= 2) score += 5;
+
+          // Disposal effectiveness bonus
+          const totalDisposals = (stats.effectiveDisposals || 0) + (stats.ineffectiveDisposals || 0);
+          if (totalDisposals > 0) {
+              const effectiveness = (stats.effectiveDisposals || 0) / totalDisposals;
+              if (effectiveness > 0.75) score += 5;
+              else if (effectiveness < 0.5) score -= 5;
+          }
+
+          // Convert score to grade
+          if (score >= 90) return 'A+';
+          if (score >= 80) return 'A';
+          if (score >= 70) return 'A-';
+          if (score >= 60) return 'B+';
+          if (score >= 50) return 'B';
+          if (score >= 40) return 'B-';
+          if (score >= 30) return 'C+';
+          if (score >= 20) return 'C';
+          if (score >= 10) return 'C-';
+          return 'D';
+      };
+
+      pStats.performanceGrade = getPerformanceGrade(pStats, player.position);
 
       return {
           homeScore: { goals: finalHomeGoals, behinds: finalHomeBehinds, total: hTotal, quarters: hQScores },
