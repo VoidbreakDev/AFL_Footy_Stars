@@ -419,6 +419,16 @@ export interface PerformerStats {
     isUser: boolean;
 }
 
+export interface MatchContext {
+  contestedPossessionWinner: 'HOME' | 'AWAY' | 'EVEN';
+  defenceAdvantage: 'HOME' | 'AWAY' | 'EVEN';
+  synergyDelta: number;          // -20 to +20, positive = home team chemistry advantage
+  pressureRating: number;        // 0–3 (mirrors pressureLevel already used in simulationUtils)
+  homeTeamRating: number;        // average player rating 0–99
+  awayTeamRating: number;
+  ratingDifferential: number;    // homeTeamRating - awayTeamRating
+}
+
 export interface MatchResult {
   homeScore: { goals: number; behinds: number; total: number; quarters: number[] };
   awayScore: { goals: number; behinds: number; total: number; quarters: number[] };
@@ -439,6 +449,8 @@ export interface MatchResult {
   highlights?: MatchEvent[];
   energyUsed?: number;
   tactic?: Tactic;
+  matchContext?: MatchContext;
+  battleReport?: string[];
 }
 
 export interface Fixture {

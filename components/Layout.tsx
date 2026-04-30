@@ -31,15 +31,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         `flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-300 relative ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`;
 
     return (
-        <div className="h-screen bg-slate-900 text-white max-w-md mx-auto relative shadow-2xl overflow-hidden flex flex-col">
+        <div className="h-screen bg-slate-900 text-white max-w-md mx-auto relative shadow-2xl flex flex-col">
             {/* Main Content Area */}
             {/* We use a calculated key to prevent remounting during match sequences */}
-            <main className="flex-1 overflow-y-auto scroll-smooth w-full" style={{ 
-                paddingTop: 'env(safe-area-inset-top)',
-                paddingBottom: 'env(safe-area-inset-bottom)',
-                paddingLeft: 'env(safe-area-inset-left)',
-                paddingRight: 'env(safe-area-inset-right)'
-            }}>
+            <main className="flex-1 overflow-y-auto scroll-smooth w-full">
                 <div key={animationKey} className="animate-slide-in min-h-full">
                     {children}
                 </div>

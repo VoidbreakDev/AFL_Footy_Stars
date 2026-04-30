@@ -18,6 +18,17 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      build: {
+        rollupOptions: {
+    external: [
+      '@capacitor/keyboard',
+      '@capacitor-community/native-audio',
+      '@revenuecat/purchases-capacitor',
+      '@google/genai'
+    ]
+        }
+      },
+
     };
 });

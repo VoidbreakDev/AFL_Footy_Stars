@@ -46,6 +46,25 @@ const FIELD_POSITIONS = [
     { id: 'FP2', label: 'FP', sub: 'FP', top: 15, left: 80 },
 ];
 
+const getEventDelay = (type: MatchEvent['type']): number => {
+  const delays: Partial<Record<MatchEvent['type'], number>> = {
+    GOAL:        2300,
+    INJURY:      2700,
+    RIVALRY:     2100,
+    BEHIND:      1700,
+    MARK:        1600,
+    FREE_KICK:   1600,
+    INTERCEPT:   1800,
+    ONE_ON_ONE:             1600,
+    ONE_ON_ONE_DEFENSIVE:   1600,
+    HIT_OUT:     1400,
+    TACKLE:      1500,
+    POSSESSION:  1350,
+    TURNOVER:    1450,
+  };
+  return delays[type] ?? 1300;
+};
+
 const MatchSim: React.FC = () => {
   const { player, currentRound, fixtures, league, generateMatchSimulation, commitMatchResult, view, setView, advanceRound, lastMatchResult } = useGame();
   const [simStep, setSimStep] = useState(0); // 0=Preview, 1=Q1, 2=Q2, 3=Q3, 4=Q4, 5=Result
@@ -78,6 +97,7 @@ const MatchSim: React.FC = () => {
   // Refs for intervals
   const quarterIntervalRef = useRef<number | null>(null);
   const loadingIntervalRef = useRef<number | null>(null);
+  const quarterTimeoutsRef = useRef<number[]>([]);
 
   // Initialize preview team
   useEffect(() => {
@@ -91,6 +111,8 @@ const MatchSim: React.FC = () => {
       return () => {
           if (quarterIntervalRef.current) clearInterval(quarterIntervalRef.current);
           if (loadingIntervalRef.current) clearInterval(loadingIntervalRef.current);
+          quarterTimeoutsRef.current.forEach(id => window.clearTimeout(id));
+          quarterTimeoutsRef.current = [];
       };
   }, []);
 
@@ -105,6 +127,8 @@ const MatchSim: React.FC = () => {
               clearInterval(loadingIntervalRef.current);
               loadingIntervalRef.current = null;
           }
+          quarterTimeoutsRef.current.forEach(id => window.clearTimeout(id));
+          quarterTimeoutsRef.current = [];
       }
   }, [view]);
 
@@ -141,35 +165,40 @@ const MatchSim: React.FC = () => {
   };
 
   const playQuarter = (quarterNum: number, data: MatchResult) => {
+      quarterTimeoutsRef.current.forEach(id => window.clearTimeout(id));
+      quarterTimeoutsRef.current = [];
       setIsPlayingQuarter(true);
       setVisibleEvents([]);
       
       const qEvents = data.timeline.filter(e => e.quarter === quarterNum);
-      let eventIndex = 0;
-      const timePerEvent = 1200; 
 
-      quarterIntervalRef.current = window.setInterval(() => {
-          if (eventIndex >= qEvents.length) {
-              if (quarterIntervalRef.current) clearInterval(quarterIntervalRef.current);
-              setIsPlayingQuarter(false);
-              return;
-          }
+      const scheduleEvents = (events: MatchEvent[], index: number) => {
+        if (index >= events.length) {
+            setIsPlayingQuarter(false);
+            return;
+        }
 
-          const event = qEvents[eventIndex];
-          setVisibleEvents(prev => [event, ...prev]);
-          
-          if (event.type === 'GOAL') {
-              const isHomeEvent = event.teamId === homeTeam.id;
-              if(isHomeEvent) setLiveHomeScore(prev => ({ ...prev, goals: prev.goals + 1, total: prev.total + 6 }));
-              else setLiveAwayScore(prev => ({ ...prev, goals: prev.goals + 1, total: prev.total + 6 }));
-          } else if (event.type === 'BEHIND') {
-               const isHomeEvent = event.teamId === homeTeam.id;
-               if(isHomeEvent) setLiveHomeScore(prev => ({ ...prev, behinds: prev.behinds + 1, total: prev.total + 1 }));
-               else setLiveAwayScore(prev => ({ ...prev, behinds: prev.behinds + 1, total: prev.total + 1 }));
-          }
+        const event = events[index];
+        const delay = getEventDelay(event.type);
+        const timeoutId = window.setTimeout(() => {
+            setVisibleEvents(prev => [event, ...prev]);
+            
+            if (event.type === 'GOAL') {
+                const isHomeEvent = event.teamId === homeTeam.id;
+                if(isHomeEvent) setLiveHomeScore(prev => ({ ...prev, goals: prev.goals + 1, total: prev.total + 6 }));
+                else setLiveAwayScore(prev => ({ ...prev, goals: prev.goals + 1, total: prev.total + 6 }));
+            } else if (event.type === 'BEHIND') {
+                 const isHomeEvent = event.teamId === homeTeam.id;
+                 if(isHomeEvent) setLiveHomeScore(prev => ({ ...prev, behinds: prev.behinds + 1, total: prev.total + 1 }));
+                 else setLiveAwayScore(prev => ({ ...prev, behinds: prev.behinds + 1, total: prev.total + 1 }));
+            }
 
-          eventIndex++;
-      }, timePerEvent);
+            scheduleEvents(events, index + 1);
+        }, delay);
+        quarterTimeoutsRef.current.push(timeoutId);
+      };
+
+      scheduleEvents(qEvents, 0);
   };
 
   const handleNextQuarter = () => {
@@ -248,6 +277,19 @@ const MatchSim: React.FC = () => {
           case 'INTERCEPT': return 'bg-slate-800 border-teal-400/40';
           default: return 'bg-slate-800 border-slate-700';
       }
+  };
+
+  const isChainedPair = (events: MatchEvent[], idx: number): boolean => {
+      if (idx === 0) return false;
+      const prev = events[idx - 1];
+      const curr = events[idx];
+      if (prev.quarter !== curr.quarter) return false;
+      const parseTime = (t: string): number => {
+          const [m, s] = t.split(':').map(Number);
+          return m * 60 + (s || 0);
+      };
+      const timeDiff = Math.abs(parseTime(curr.time) - parseTime(prev.time));
+      return timeDiff <= 60 && (prev.isPlayerInvolved || curr.isPlayerInvolved);
   };
 
   const getFieldLayout = (team: Team) => {
@@ -441,7 +483,9 @@ const MatchSim: React.FC = () => {
   }
 
   // Debug logging to understand component state
-  console.log(`[MatchSim] Render debug: simStep=${simStep}, playing=${isPlayingQuarter}, hasData=${!!currentSimData}, view=${view}, loading=${loading}`);
+  if (typeof window !== 'undefined') {
+    console.log(`[MatchSim] Render debug: simStep=${simStep}, playing=${isPlayingQuarter}, hasData=${!!currentSimData}, view=${view}, loading=${loading}`);
+  }
 
   if (simStep >= 1 && simStep <= 4 && currentSimData) {
       const myLiveScore = isHome ? liveHomeScore : liveAwayScore;
@@ -487,16 +531,27 @@ const MatchSim: React.FC = () => {
                         const eventTeam = league.find(t => t.id === event.teamId);
                         const teamColor = eventTeam?.colors[0] || '#64748b';
                         return (
-                            <div key={idx} className={`p-3 rounded-lg text-sm border-l-4 animate-fade-in transition-all flex gap-3 items-start shrink-0 ${getEventStyle(event)} ${event.isPlayerInvolved ? 'scale-105' : ''}`}>
-                                <div className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-black border-2 border-white/20 text-xs shadow-sm" style={{ backgroundColor: teamColor, color: '#fff' }}>{eventTeam ? eventTeam.name.charAt(0) : '?'}</div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between mb-1">
-                                        <span className={`font-bold text-xs ${event.isPlayerInvolved ? 'text-emerald-400' : event.type === 'INJURY' ? 'text-red-400' : 'text-slate-400'}`}>{event.time} • {event.type}</span>
+                            <React.Fragment key={idx}>
+                                {isChainedPair(visibleEvents, idx) && (
+                                    <div style={{
+                                        width: 2,
+                                        height: 12,
+                                        backgroundColor: 'currentColor',
+                                        opacity: 0.3,
+                                        marginLeft: 20,
+                                    }} />
+                                )}
+                                <div className={`p-3 rounded-lg text-sm border-l-4 animate-fade-in transition-all flex gap-3 items-start shrink-0 ${getEventStyle(event)} ${event.isPlayerInvolved ? 'scale-105' : ''}`}>
+                                    <div className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-black border-2 border-white/20 text-xs shadow-sm" style={{ backgroundColor: teamColor, color: '#fff' }}>{eventTeam ? eventTeam.name.charAt(0) : '?'}</div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between mb-1">
+                                            <span className={`font-bold text-xs ${event.isPlayerInvolved ? 'text-emerald-400' : event.type === 'INJURY' ? 'text-red-400' : 'text-slate-400'}`}>{event.time} • {event.type}</span>
+                                        </div>
+                                        <div className="text-slate-200 leading-snug break-words">{event.description}</div>
                                     </div>
-                                    <div className="text-slate-200 leading-snug break-words">{event.description}</div>
+                                    <div className="text-2xl shrink-0 opacity-80 select-none">{getEventIcon(event.type)}</div>
                                 </div>
-                                <div className="text-2xl shrink-0 opacity-80 select-none">{getEventIcon(event.type)}</div>
-                            </div>
+                            </React.Fragment>
                         );
                     })}
                     {visibleEvents.length === 0 && !isPlayingQuarter && (

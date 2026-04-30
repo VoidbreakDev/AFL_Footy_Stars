@@ -2,6 +2,15 @@
 
 > **Purpose:** This is the definitive reference for AI coding agents working on this codebase. Read this entire file before touching anything. It supersedes `CLAUDE.md` wherever they conflict — this file reflects the actual current state of the code.
 
+> **Skills:** Workflow skills are auto-discovered from `.vibe/skills/`. Key skills:
+> - Fixing a bug → `systematic-debugging` then `bug-fix`
+> - Planning a new feature → `brainstorming` then `writing-plans`
+> - Implementing from a plan → `new-feature` + `typescript-react-patterns`
+> - Validating before handoff → `testing`
+> - Reviewing code quality → `code-review`
+>
+> **Docs:** Design specs live in `docs/superpowers/specs/`. Implementation plans live in `docs/superpowers/plans/`.
+
 ---
 
 ## 1. Project snapshot
@@ -713,3 +722,14 @@ seasonEnded = (currentRound === SEASON_LENGTH + 2)
 - **Positions:** Forward (scoring), Midfielder (contested ball, disposals), Defender (intercepts, spoils, locks down forwards), Ruck (contests ball-ups, leads ruck division)
 - **Sub-positions** used in code: HFF (Half Forward Flank), C (Centre), HBF (Half Back Flank), RUCK, INT (Interchange/utility)
 - **Season** runs Feb–Sep in reality; abstracted to 14 rounds + 2 finals rounds in game
+
+---
+
+## 16. Known Gotchas
+ - **CSS GOTCHA** — Stacking context breaks fixed overlays:
+Any transform value other than `none` on an ancestor element creates a new 
+containing block for position: fixed descendants. After animation completes, 
+ensure final keyframe uses `transform: none` not `transform: translateY(0)`. 
+Affects: FinalsIntro, SeasonRecap, AwardsCeremony, DailyRewardModal, 
+SemiFinalsResults, GrandFinalResult — all rendered under animate-slide-in 
+wrapper in Layout.tsx.

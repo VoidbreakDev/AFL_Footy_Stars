@@ -5,6 +5,7 @@ import { StorageService } from '../services/storageService';
 import { SEASON_LENGTH, TEAM_NAMES_LOCAL, FIRST_NAMES, LAST_NAMES, MILESTONES, RETIREMENT_AGE, SHOP_ITEMS } from '../constants';
 import { generateLeague, generateFixtures, updateLadderTeam, generateSemiFinals, generateGrandFinal } from '../utils/leagueUtils';
 import { calculateMatchOutcome, simulateCPUMatch } from '../utils/simulationUtils';
+import { contextHighlightScore } from '../utils/matchEngineUtils';
 import { checkAchievements } from '../utils/achievementUtils';
 import { canClaimDailyReward, claimDailyReward } from '../utils/dailyRewardUtils';
 import { shouldUpdateNickname, generateNickname } from '../utils/nicknameUtils';
@@ -408,15 +409,24 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Select top 5 highlights from the timeline
       const selectHighlights = (events: MatchEvent[]): MatchEvent[] => {
-          const priority = (e: MatchEvent): number => {
-              if (e.type === 'GOAL' && e.isPlayerInvolved) return 10;
-              if (e.type === 'INJURY') return 8;
-              if (e.type === 'RIVALRY') return 7;
-              if ((e.type === 'MARK' || e.type === 'TACKLE') && e.isPlayerInvolved) return 6;
-              if (e.isPlayerInvolved) return 4;
-              return 1;
-          };
-          return [...events].sort((a, b) => priority(b) - priority(a)).slice(0, 5);
+          const isFinals = currentRound > 14;
+          let runningDiff = 0;
+
+          return [...events]
+            .map(e => {
+              // Maintain a running score diff for context scoring
+              if (e.type === 'GOAL') {
+                const isPlayerTeamGoal = e.teamId === player?.contract?.clubName; // approximate
+                runningDiff += isPlayerTeamGoal ? 6 : -6;
+              }
+              return {
+                event: e,
+                score: contextHighlightScore(e, e.quarter, runningDiff, isFinals),
+              };
+            })
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5)
+            .map(x => x.event);
       };
       const highlights = selectHighlights(result.timeline ?? []);
 

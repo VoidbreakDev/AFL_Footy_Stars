@@ -1,418 +1,404 @@
-# CLAUDE.md - AFL Footy Stars Development Guide
+# CLAUDE.md — AFL Footy Stars
 
-> **For AI Assistants**: This document provides comprehensive guidance for understanding and working with the AFL Footy Stars codebase.
-
-## Table of Contents
-1. [Project Overview](#project-overview)
-2. [Repository Structure](#repository-structure)
-3. [Tech Stack](#tech-stack)
-4. [Key Concepts & Domain Knowledge](#key-concepts--domain-knowledge)
-5. [Architecture & Patterns](#architecture--patterns)
-6. [Development Workflow](#development-workflow)
-7. [Code Conventions](#code-conventions)
-8. [Adding New Features](#adding-new-features)
-9. [State Management](#state-management)
-10. [Common Tasks](#common-tasks)
-11. [Important Files Reference](#important-files-reference)
-12. [Known Issues & TODOs](#known-issues--todos)
+> Read this file **before touching any code**. It reflects the actual current state of the codebase as of v1.4.
+> Where this file and AGENTS.md conflict, treat AGENTS.md as the deeper technical reference — this file is your orientation and rules layer.
 
 ---
 
-## Project Overview
+## 1. Project snapshot
 
-**AFL Footy Stars** is a comprehensive Australian Football League (AFL) career simulation game built as a single-page React application. Players create a custom AFL player and progress through their career from local leagues to the AFL, managing attributes, contracts, matches, achievements, and more.
-
-### Core Features
-- **Player Creation**: Customizable player with name, position, avatar, jersey number
-- **Career Progression**: Advance through Local League → State League → AFL
-- **Match Simulation**: Dynamic match engine with real-time events and AI commentary
-- **Training System**: Attribute improvement via skill points
-- **Achievement System**: 70+ unlockable achievements across 5 categories
-- **Daily Rewards**: 14-day login streak system
-- **Nicknames**: Dynamic nickname system based on playstyle
-- **Player Comparison**: Compare stats with league players
-- **Season Recap**: End-of-season performance summaries
-- **Milestones Gallery**: Visual career milestone tracking
-- **Draft System**: Interactive AFL draft with prospect generation and picks
-- **Transfer Market**: Dynamic transfer offers and contract negotiations
-- **Shop System**: 28+ purchasable items across 4 categories (recovery, training, boosters, career)
-- **Media Hub**: Media reputation, fan followers, social media management
-- **Team Chemistry**: Teammate relationships, personality interactions, morale system
-- **Coaching Staff**: Hire coaches and staff with specialties and personality effects
-- **Career Events**: 30+ random events with choice-based outcomes
-- **Master Skill Tree**: 30+ advanced unlockable skills with attribute prerequisites
-- **Finals System**: Full finals bracket — semi-finals and Grand Final screens
-- **Awards Ceremony**: Season award presentations (Brownlow, Coleman, All-Australian, etc.)
-- **Post-Match Press**: Press conference interactions after matches
-
-### Version
-Current Version: **1.1.0.0**
+| Field | Value |
+|-------|-------|
+| Name | AFL Footy Stars |
+| **Current version** | **v1.4** (Capacitor mobile + Xcode pipeline) |
+| **Next version** | **v1.5** (see Section 9) |
+| Type | React SPA — no router, no backend, no auth |
+| Runtime | Browser + native iOS via Capacitor |
+| Persistence | `localStorage` (web) / `@capacitor/preferences` (native) — see `services/storageService.ts` |
+| Save key format | `footyLegendSave_slot{N}` (slots 0–2); legacy key `footyLegendSave` auto-migrates |
+| Entry point | `index.tsx` → `App.tsx` → `GameProvider` → view switch |
+| Build tool | Vite 6.2 |
+| Language | TypeScript 5.8 (non-strict, isolated modules) |
+| Styling | Tailwind CSS — utility classes only, no CSS modules |
+| State | Single React Context in `context/GameContext.tsx` (~2200 lines) |
+| External APIs | Google Gemini (`@google/genai` v1.30) — optional; DiceBear avatar SVGs |
+| App ID | `com.aflstars.game` |
 
 ---
 
-## Repository Structure
+## 2. Dev environment & build commands
+
+### Web (primary dev)
+```bash
+npm install
+npm run dev        # Vite dev server → http://localhost:3000
+npm run build      # TypeScript compile + Vite bundle — MUST pass with zero errors
+npm run preview    # Preview production build from /dist
+```
+
+### iOS / Xcode (Capacitor)
+```bash
+npm run build                # Build web assets to /dist first — always do this before cap sync
+npx cap sync ios             # Copy /dist into Xcode project, sync plugins
+npx cap open ios             # Open Xcode (or open ios/App/App.xcworkspace manually)
+```
+
+**Xcode workspace:** `ios/App/App.xcworkspace` — always open the `.xcworkspace`, not the `.xcodeproj`.
+
+**Live reload in dev:** Set `VITE_LOCAL_IP` in `.env` to your machine's local IP. `capacitor.config.ts` will proxy the Capacitor shell to `http://<IP>:3000` during development only.
+
+### Environment variables
+```
+GEMINI_API_KEY=your_key_here     # Optional — game works without it
+VITE_LOCAL_IP=192.168.x.x        # Optional — enables Capacitor live reload
+```
+Vite exposes both `process.env.API_KEY` and `process.env.GEMINI_API_KEY` (both defined in `vite.config.ts`).
+
+### Path alias
+`@/` resolves to the project root. Use it for all cross-directory imports:
+```typescript
+import { useGameContext } from '@/context/GameContext';
+```
+
+---
+
+## 3. Xcode & Capacitor — critical notes
+
+### ⚠️ Never edit files inside `ios/` directly
+`npx cap sync` regenerates the `ios/` directory from your web build and `capacitor.config.ts`. Any manual edits to Xcode project files will be overwritten on the next sync. iOS-specific config belongs in `capacitor.config.ts` only.
+
+### Current Capacitor config (`capacitor.config.ts`)
+```typescript
+appId: 'com.aflstars.game'
+appName: 'AFL Footy Stars'
+webDir: 'dist'
+backgroundColor: '#0f172a'
+ios.contentInset: 'always'
+ios.scrollEnabled: false
+plugins: SplashScreen, StatusBar, Keyboard (all configured)
+```
+
+### Installed Capacitor plugins (from package.json)
+```
+@capacitor/core ^8.3.1        @capacitor/ios ^8.3.1
+@capacitor/android ^8.3.1     @capacitor/app ^8.1.0
+@capacitor/haptics ^8.0.2     @capacitor/local-notifications ^8.0.2
+@capacitor/preferences ^8.0.1 @capacitor/share ^8.0.1
+@capacitor/splash-screen ^8.0.1  @capacitor/status-bar ^8.0.2
+```
+
+### Common Xcode issues
+| Symptom | Fix |
+|---------|-----|
+| Blank white screen on launch | `cap sync` not run after web build — run `npm run build && npx cap sync ios` |
+| Signing error on build | Set Team to your Apple ID under Signing & Capabilities in Xcode |
+| Old save data loading after code change | Delete app from Simulator — `@capacitor/preferences` persists across installs |
+| "module not found" build error | Run `npx cap sync ios` then `pod install` inside `ios/App/` |
+| EXC_BAD_ACCESS crash on launch | `AdService` or `IAPService` was accidentally re-enabled — both must stay disabled in dev |
+
+### Storage on native vs web
+`services/storageService.ts` routes saves to:
+- **Native (iOS):** `@capacitor/preferences` (survives app updates, persists across Capacitor sync)
+- **Web:** `localStorage` (existing behaviour)
+
+Legacy `footyLegendSave` key auto-migrates to `footyLegendSave_slot0` on first native run.
+
+---
+
+## 4. Full file map
 
 ```
 AFL_Footy_Stars/
-├── components/              # React UI components (30 total)
-│   ├── Dashboard.tsx        # Main game dashboard (home screen)
-│   ├── Onboarding.tsx       # Player creation wizard
-│   ├── MatchSim.tsx         # Live match simulation view
-│   ├── Training.tsx         # Attribute training interface
-│   ├── Achievements.tsx     # Achievement tracking screen
-│   ├── DailyRewardModal.tsx # Daily login rewards popup
-│   ├── PlayerComparison.tsx # Player stats comparison tool
-│   ├── SeasonRecap.tsx      # End-of-season summary
-│   ├── MilestonesGallery.tsx# Career milestones timeline
-│   ├── CareerSummary.tsx    # Retirement/career overview
-│   ├── LeagueView.tsx       # League ladder & standings
-│   ├── ClubHub.tsx          # Team/club information
-│   ├── PlayerStats.tsx      # Player statistics display
-│   ├── Settings.tsx         # Game settings & preferences
-│   ├── Layout.tsx           # App layout wrapper
-│   ├── Avatar.tsx           # Avatar display component
-│   ├── AwardsCeremony.tsx   # End-of-season award ceremony screen
-│   ├── CareerEvents.tsx     # Random career events with choice outcomes
-│   ├── CoachingStaff.tsx    # Coaching staff hire/manage interface
-│   ├── Draft.tsx            # AFL draft with prospects & picks
-│   ├── FinalsIntro.tsx      # Finals series intro screen (modal overlay)
-│   ├── GrandFinalResult.tsx # Grand Final result & celebration (modal overlay)
-│   ├── MasterSkillTree.tsx  # Advanced unlockable skill progression
-│   ├── MediaHub.tsx         # Media events, social media, fan reputation
-│   ├── PostMatchPress.tsx   # Post-match press conference interactions
-│   ├── SemiFinalsResults.tsx# Semi-finals results screen (modal overlay)
-│   ├── Shop.tsx             # In-game shop (28+ items, 4 categories)
-│   ├── TeamChemistry.tsx    # Teammate relationships & team morale
-│   ├── TeamLogo.tsx         # Team logo display helper component
-│   └── TransferMarket.tsx   # Transfer offers & contract negotiation
+├── App.tsx                       # Root — GameProvider + view switch
+├── index.tsx                     # ReactDOM.createRoot mount
+├── index.html                    # HTML shell
+├── types.ts                      # ALL interfaces & enums (~700 lines) — read first
+├── constants.ts                  # ALL game data & config (~1723 lines) — read second
+├── capacitor.config.ts           # Capacitor/iOS/Android config
+├── vite.config.ts                # Port 3000, host 0.0.0.0, @/ alias, env injection
+├── package.json                  # Dependencies & scripts
+├── tailwind.config.js
+├── postcss.config.js
+├── tsconfig.json
+├── metadata.json
+├── .env.example
 │
 ├── context/
-│   └── GameContext.tsx      # Global game state (React Context, ~3000 lines)
+│   └── GameContext.tsx           # Single source of all game state & actions (~2200 lines)
 │
-├── utils/                   # Business logic & utilities (15 files)
-│   ├── simulationUtils.ts   # Match simulation engine
-│   ├── leagueUtils.ts       # League generation & ladder logic
-│   ├── achievementUtils.ts  # Achievement checking & unlocking
-│   ├── nicknameUtils.ts     # Nickname generation logic
-│   ├── dailyRewardUtils.ts  # Daily reward streak tracking
-│   ├── awardUtils.ts        # Season award calculation (Brownlow, Coleman, etc.)
-│   ├── careerEventUtils.ts  # Career event generation & resolution
-│   ├── chemistryUtils.ts    # Team chemistry & relationship tracking
-│   ├── coachingUtils.ts     # Coach/staff initialisation & interactions
-│   ├── draftUtils.ts        # Draft prospect generation & pick simulation
-│   ├── masterSkillUtils.ts  # Skill tree unlocking & progression
-│   ├── mediaUtils.ts        # Media reputation, social posts, fan milestones
-│   ├── rosterUtils.ts       # Team roster turnover & AI player retirement
-│   ├── seasonUtils.ts       # Season progression, promotion/relegation, salary
-│   └── transferUtils.ts     # Transfer offer generation & salary logic
+├── components/                   # 37 React UI components
+│   ├── SlotSelect.tsx            # 3-slot save picker — app start screen
+│   ├── Onboarding.tsx            # Player creation wizard
+│   ├── Dashboard.tsx             # Main hub — fixtures, quick stats, nav
+│   ├── Hub.tsx                   # Secondary hub component
+│   ├── BackHeader.tsx            # Shared back-navigation header
+│   ├── Layout.tsx                # Nav shell wrapper
+│   ├── MatchSim.tsx              # Match flow — tactic picker → live sim → result
+│   ├── MatchPredictionCard.tsx   # Pre-match prediction UI
+│   ├── DerbyBuildup.tsx          # Pre-match rivalry build-up screen
+│   ├── Training.tsx              # Attribute training + rehab panel
+│   ├── PlayerStats.tsx           # Career & season stats
+│   ├── LeagueView.tsx            # Ladder standings
+│   ├── ClubHub.tsx               # Team info, captain speech, club history
+│   ├── TransferMarket.tsx        # Transfer offer cards
+│   ├── Shop.tsx                  # 28+ purchasable items
+│   ├── MasterSkillTree.tsx       # Skill unlock interface
+│   ├── MediaHub.tsx              # Reputation, media events, social posts, conferences
+│   ├── CareerEvents.tsx          # Active event cards with choice UI
+│   ├── StoryArcPanel.tsx         # v1.3 story arc display
+│   ├── TeamChemistry.tsx         # Teammate relationship grid
+│   ├── CoachingStaff.tsx         # Hire/view coaching staff
+│   ├── Achievements.tsx          # Achievement grid
+│   ├── MilestonesGallery.tsx     # Career milestone timeline
+│   ├── PlayerComparison.tsx      # Side-by-side stats comparison
+│   ├── Draft.tsx                 # Interactive draft board
+│   ├── SeasonRecap.tsx           # End-of-season summary (modal overlay)
+│   ├── AwardsCeremony.tsx        # Season award presentations (modal overlay)
+│   ├── FinalsIntro.tsx           # Finals series entry (modal overlay)
+│   ├── SemiFinalsResults.tsx     # Semi-final results (modal overlay)
+│   ├── GrandFinalResult.tsx      # Grand Final result + celebration (modal overlay)
+│   ├── CareerSummary.tsx         # Retirement overview
+│   ├── CareerTimeline.tsx        # Season-by-season history (inline in CareerSummary)
+│   ├── CareerExport.tsx          # Shareable career card (inline in CareerSummary)
+│   ├── PostMatchPress.tsx        # Post-match press conference (inline in MatchSim)
+│   ├── Settings.tsx              # App settings, reset
+│   ├── TipCard.tsx               # Dismissible tip banner (utility)
+│   ├── DailyRewardModal.tsx      # Daily login reward UI
+│   ├── Avatar.tsx                # DiceBear SVG renderer (utility)
+│   └── TeamLogo.tsx              # Team logo with emoji fallback (utility)
 │
-├── services/
-│   └── geminiService.ts     # Google Gemini AI commentary integration
+├── utils/                        # 19 pure business-logic files
+│   ├── simulationUtils.ts        # Match simulation engine
+│   ├── leagueUtils.ts            # League generation, fixtures, ladder
+│   ├── seasonUtils.ts            # Promotion/relegation, salary, season wrap-up
+│   ├── careerEventUtils.ts       # Career event generation & resolution
+│   ├── storyArcUtils.ts          # v1.3 story arc system
+│   ├── mediaUtils.ts             # Media reputation, conferences, social posts
+│   ├── chemistryUtils.ts         # Team chemistry & relationship tracking
+│   ├── coachingUtils.ts          # Coaching staff initialisation & effects
+│   ├── transferUtils.ts          # Transfer offer generation & salary logic
+│   ├── draftUtils.ts             # Draft prospect generation & pick simulation
+│   ├── awardUtils.ts             # Season award calculation
+│   ├── achievementUtils.ts       # Achievement checking & unlocking
+│   ├── masterSkillUtils.ts       # Skill tree unlocking & prerequisites
+│   ├── legacyUtils.ts            # Legacy score calculation
+│   ├── objectiveUtils.ts         # Season & weekly objectives
+│   ├── preSeasonUtils.ts         # Pre-season camp system
+│   ├── rosterUtils.ts            # AI team roster turnover
+│   ├── nicknameUtils.ts          # Nickname generation
+│   └── dailyRewardUtils.ts       # Daily reward streak tracking
 │
-├── types.ts                 # TypeScript type definitions (~670 lines)
-├── constants.ts             # Game constants & configuration data (~1275 lines)
-├── App.tsx                  # Root React component
-├── index.tsx                # Application entry point
-├── index.html               # HTML template
-├── vite.config.ts           # Vite build configuration
-├── tsconfig.json            # TypeScript configuration
-├── package.json             # Dependencies & scripts
-├── metadata.json            # Project metadata
-├── .env.example             # Environment variable template
-└── README.md                # User-facing documentation
+├── services/                     # Native/external service wrappers (all added in v1.4)
+│   ├── storageService.ts         # ✅ ACTIVE — Capacitor Preferences vs localStorage routing
+│   ├── iapService.ts             # ⛔ STUBBED — RevenueCat IAP (disabled, NSIndexPath crash)
+│   ├── adService.ts              # ⛔ STUBBED — AdMob rewarded ads (disabled, EXC_BAD_ACCESS)
+│   ├── hapticsService.ts         # ✅ ACTIVE — Capacitor Haptics wrapper
+│   ├── notificationService.ts    # ✅ ACTIVE — Capacitor Local Notifications wrapper
+│   ├── audioService.ts           # ✅ ACTIVE — Audio playback service
+│   └── geminiService.ts          # ✅ ACTIVE (optional) — Gemini AI commentary
+│
+├── _prompts/                     # Sub-agent feature prompt files
+│   ├── README.md
+│   ├── 01_GAMEPLAY.md
+│   ├── 02_PROGRESSION.md
+│   ├── 03_SOCIAL_MEDIA.md
+│   ├── 04_POLISH_UX.md
+│   └── 05_CONTENT.md
+│
+├── Feature Specs/                # Version specification documents
+│   ├── AFL_FootyStars_v1.3_Spec.md
+│   ├── AFL_FootyStars_v1.3_Spec.docx
+│   └── AFL_FootyStars_v1.3.1_UI_Spec.md
+│
+├── ios/                          # ⚠️ Capacitor-generated — DO NOT edit directly
+│   └── App/
+│       ├── App.xcworkspace       # ← Open this in Xcode
+│       └── App.xcodeproj
+├── android/                      # Capacitor-generated Android project
+└── dist/                         # Vite production build output (gitignored)
 ```
-
-### Key Directory Purposes
-
-| Directory/File | Purpose |
-|---|---|
-| `components/` | All React UI components (presentational & container) |
-| `context/` | Global state management via React Context API |
-| `utils/` | Pure business logic functions (match simulation, calculations) |
-| `services/` | External service integrations (AI commentary) |
-| `types.ts` | TypeScript interfaces & enums for type safety |
-| `constants.ts` | Game configuration, team names, achievements, milestones, shop items |
 
 ---
 
-## Tech Stack
+## 5. Version history
 
-### Core Technologies
-- **React 19.2** - UI framework with modern hooks
-- **TypeScript 5.8.2** - Type safety & developer experience
-- **Vite 6.2** - Fast build tool & dev server
-- **Tailwind CSS** - Utility-first styling
-
-### External APIs
-- **Google Gemini AI** (`@google/genai` v1.30.0) - AI-powered match commentary (optional)
-- **DiceBear API** - SVG avatar generation (Micah style)
-
-### Build Tools
-- **@vitejs/plugin-react** - React Fast Refresh support
-- **TypeScript** - Type checking & compilation
-
-### Data Persistence
-- **LocalStorage** - Save game persistence (no backend)
+| Version | Status | Summary |
+|---------|--------|---------|
+| v0.0.1.0_Gamma | ✅ Done | Initial feature-complete — achievements, daily rewards, nicknames, milestones |
+| v1.0 | ✅ Done | Full career sim — draft, seasons, training, match engine, finals, awards, 70+ achievements |
+| v1.1 | ✅ Done | Fan mail, club culture, rivalry expansion, training mini-games, club history, AFLW path |
+| v1.2 | ✅ Done | Objectives, pre-season camp, representative honours, team selection drama, legacy score |
+| v1.3 | ✅ Done | Story Arcs, Media Conferences, Club Culture active effects, Legacy Moments, Dynamic Biography |
+| v1.3.1 | ✅ Done | UI polish — Hub redesign, Shop redesign, mobile responsive pass |
+| **v1.4** | ✅ **Current** | Capacitor iOS/Android wrapper, Xcode build pipeline, `storageService.ts`, `iapService.ts` stub, `adService.ts` stub, `hapticsService.ts`, `notificationService.ts`, `audioService.ts` |
+| **v1.5** | 🔄 **Next** | See Section 9 |
 
 ---
 
-## Key Concepts & Domain Knowledge
+## 6. Architecture overview
 
-### AFL (Australian Football League) Basics
-AFL is a contact sport played on an oval field with 18 players per team. Key concepts:
-- **Goals** (6 points) vs **Behinds** (1 point)
-- **Disposals** = Kicks + Handballs
-- **Brownlow Medal** - Best & fairest player award (votes)
-- **Premiership** - Championship/Grand Final winner
-- **Finals** - Top 4 teams compete in playoffs
-
-### Game Positions
-Defined in `types.ts` as `Position` enum:
-- **FORWARD** - Scoring specialists (Goal Sense important)
-- **MIDFIELDER** - All-rounders (Disposals, Speed, Stamina)
-- **DEFENDER** - Defensive specialists (Tackling, Marking)
-- **RUCK** - Tall players who contest ball-ups (Marking, Stamina)
-
-### Player Attributes (all 0-99)
-From `PlayerAttributes` interface in `types.ts`:
-- `kicking` - Goal accuracy, long kicks
-- `handball` - Short passing
-- `tackling` - Defensive pressure
-- `marking` - Catching ability
-- `speed` - Movement & agility
-- `stamina` - Endurance & energy recovery
-- `goalSense` - Scoring instinct
-
-### League Tiers
-Progression system (`LeagueTier` enum):
-1. **Local League** - Amateur clubs (e.g., "Mudcrabs", "Bushrangers") — 8 teams
-2. **State League** - Regional competition (e.g., "Wildcats", "Scorpions") — 8 teams
-3. **AFL** - Professional league (e.g., "Collingwood", "Richmond") — 8 teams
-
-### Career Progression
-- Start at age 18, retire at 35 (`constants.ts`)
-- Earn XP from matches → Level up → Gain skill points
-- Train attributes (costs skill points + energy)
-- Attributes capped at `player.potential` (varies per player)
-- Manage contracts, injuries, morale, energy, wallet
-- Season length: **14 regular rounds + finals**
-
-### Economy System
-- `player.wallet` — current money (earned from contracts, bonuses, shop)
-- `player.lifetimeEarnings` — total career earnings
-- `player.itemsPurchased[]` — purchase history
-- Shop items span 4 categories: RECOVERY, TRAINING, ATTRIBUTE_BOOST, CAREER
-
-### Media & Reputation System
-- `player.mediaReputation` — MediaReputation object (score, tier, followers, events)
-- Media tiers unlock new event types and sponsor opportunities
-- Respond to media events via `respondToMedia()` (HUMBLE / CONFIDENT / IGNORE)
-- Create social posts via `createSocialPost()`
-
-### Team Chemistry System
-- `player.teammates[]` — TeammateRelationship[] tracking each teammate
-- `player.teamChemistry` — TeamChemistry object (team-wide morale/chemistry)
-- Relationship statuses: ENEMY → RIVAL → STRANGER → ACQUAINTANCE → FRIEND → CLOSE_FRIEND → BEST_MATE
-- Team chemistry states: FREEZING → COLD → NEUTRAL → WARM → HOT
-
-### Coaching Staff System
-- `player.coachingStaff` — CoachingStaff object (head coach + staff members)
-- Coaches have personalities (DISCIPLINARIAN, MENTOR, TACTICIAN, MOTIVATOR, INNOVATOR, VETERAN)
-- Staff roles: FITNESS_TRAINER, PHYSIO, NUTRITIONIST, MENTAL_COACH, SKILLS_COACH
-- Hire via `hireCoachingStaff()` — costs wallet funds
-
-### Master Skill Tree
-- 30+ advanced skills unlocked via `masterSkillUtils.ts`
-- Categories: KICKING, MARKING, HANDBALL, SPEED/STAMINA, TACKLING
-- Rarities: COMMON, RARE, EPIC, LEGENDARY
-- Requirements: minimum attribute level (25–70+), XP cost (2500–12000), skill point cost (10–30)
-
-### Career Events
-- 30+ random event templates in `constants.ts`
-- Types: positive (bonuses, mentorship), negative (injury, backlash), choice-based (sponsorship, conflicts)
-- Resolved via `resolveEventChoice(eventId, choiceId)` — **choiceId is required for choice events**
-
-### Draft System
-- Interactive AFL draft at season end when promoted
-- `draftUtils.ts` generates prospect pool; `Draft.tsx` handles UI
-- User picks prospect; remaining picks simulated via `simulateDraft()`
-- AFL teams use correct names (e.g., "Collingwood", not "Collingwood FC") — fixed in `leagueUtils.ts`
-
-### Finals System
-- Top 4 teams qualify after 14 regular rounds
-- Finals progression uses modal overlays (not view switches):
-  - `showFinalsIntro` → `FinalsIntro.tsx`
-  - `showSemiFinalsResults` → `SemiFinalsResults.tsx`
-  - `showGrandFinalResult` → `GrandFinalResult.tsx`
-
-### Awards
-9 award types tracked via `awardUtils.ts`:
-Brownlow Medal, Coleman Medal, All-Australian Team, Club Best & Fairest, Rising Star, Leading Disposal Winner, Leading Tackler, Mark of the Year, Goal of the Year
-
----
-
-## Architecture & Patterns
-
-### Component Architecture
-**Container/Presentational Pattern** (implicit):
-- Most components in `components/` are container components
-- They consume `GameContext` for state
-- Handle both logic and presentation
-
-**View Routing** via `view` state:
-- No React Router — single-page app with view switching
-- `view` state in `GameContext` determines which component renders
-- Full list of 22 view states:
-
+### View routing
+No React Router. Navigation is the `view` string in GameContext:
+```typescript
+type View =
+  'SLOT_SELECT' | 'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' |
+  'MATCH_RESULT' | 'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' |
+  'MILESTONES' | 'PLAYER_COMPARISON' | 'TRANSFER_MARKET' | 'SHOP' | 'SETTINGS' |
+  'CAREER_SUMMARY' | 'DRAFT' | 'MEDIA_HUB' | 'CAREER_EVENTS' | 'TEAM_CHEMISTRY' |
+  'COACHING_STAFF' | 'MASTER_SKILLS'
 ```
-'ONBOARDING' | 'DASHBOARD' | 'MATCH_PREVIEW' | 'MATCH_SIM' | 'MATCH_RESULT' |
-'TRAINING' | 'CLUB' | 'LEAGUE' | 'PLAYER' | 'ACHIEVEMENTS' | 'MILESTONES' |
-'PLAYER_COMPARISON' | 'TRANSFER_MARKET' | 'SHOP' | 'SETTINGS' | 'CAREER_SUMMARY' |
-'DRAFT' | 'MEDIA_HUB' | 'CAREER_EVENTS' | 'TEAM_CHEMISTRY' | 'COACHING_STAFF' |
-'MASTER_SKILLS'
+**App always starts at `'SLOT_SELECT'`** — never `'DASHBOARD'` or `'ONBOARDING'` directly.
+
+Finals/recap screens are modal overlays (boolean flags in GameContext), not view states:
+
+| Flag | Component | Triggered when |
+|------|-----------|---------------|
+| `showFinalsIntro` | `FinalsIntro.tsx` | `currentRound === SEASON_LENGTH` |
+| `showSemiFinalsResults` | `SemiFinalsResults.tsx` | `currentRound === SEASON_LENGTH + 1` |
+| `showGrandFinalResult` | `GrandFinalResult.tsx` | `currentRound === SEASON_LENGTH + 2` |
+| `showSeasonRecap` | `SeasonRecap.tsx` | `seasonEnded === true` |
+| `showAwardsCeremony` | `AwardsCeremony.tsx` | After season recap dismissal |
+
+Finals rounds are `SEASON_LENGTH + 1` (semis) and `SEASON_LENGTH + 2` (GF) — the season is logically 16 rounds long even though `SEASON_LENGTH = 14`.
+
+### State management
+Single global `GameContext` via React Context API. No Redux. Auto-save fires on every state change via `useEffect` watching `[player, league, fixtures, currentRound, lastMatchResult]`.
+
+### Save system
+```typescript
+// Key format
+`footyLegendSave_slot${N}`   // slots 0, 1, 2
+
+// Payload
+{ player: PlayerProfile, league: Team[], fixtures: Fixture[], currentRound: number }
 ```
+On native iOS, `storageService.ts` routes saves through `@capacitor/preferences` instead of `localStorage`.
 
-Finals screens (FinalsIntro, SemiFinalsResults, GrandFinalResult) are boolean-flag modal overlays, not view states.
-
-### State Management
-**Centralized Global State** via React Context:
-- Single `GameContext` (`context/GameContext.tsx`) manages all game state (~3000 lines)
-- No Redux or external state libraries
-
-**Persistence**:
-- `saveGame()` → Saves to `localStorage` under key **`'footyLegendSave'`**
-- `loadGame()` → Loads from `localStorage`
-- Auto-save on state changes (implicit in context)
-
-### Data Flow
-```
-User Action (Component)
-    ↓
-Context Function (e.g., trainAttribute, commitMatchResult)
-    ↓
-Update State (setPlayer, setLeague)
-    ↓
-Component Re-renders
-    ↓
-Auto-save to LocalStorage
-```
-
-### Business Logic Location
-- **Match Simulation**: `utils/simulationUtils.ts` — `calculateMatchOutcome()`, `simulateCPUMatch()`
-- **League Management**: `utils/leagueUtils.ts` — `generateLeague()`, `generateFixtures()`, `updateLadderTeam()`
-- **Season Progression**: `utils/seasonUtils.ts` — promotion/relegation, salary, season wrap-up
-- **Achievements**: `utils/achievementUtils.ts` — `checkAchievements()`
-- **Awards**: `utils/awardUtils.ts` — Brownlow/Coleman/All-Australian calculations
-- **Nicknames**: `utils/nicknameUtils.ts` — `shouldUpdateNickname()`, `generateNickname()`
-- **Draft**: `utils/draftUtils.ts` — prospect generation, pick simulation
-- **Transfer**: `utils/transferUtils.ts` — offer generation, salary negotiation
-- **Media**: `utils/mediaUtils.ts` — reputation events, fan milestones
-- **Chemistry**: `utils/chemistryUtils.ts` — relationship tracking, morale effects
-- **Coaching**: `utils/coachingUtils.ts` — staff initialisation, passive buffs
-- **Career Events**: `utils/careerEventUtils.ts` — event generation, choice resolution
-- **Master Skills**: `utils/masterSkillUtils.ts` — skill unlocking, prerequisite checking
-- **Roster**: `utils/rosterUtils.ts` — AI team roster turnover between seasons
-
----
-
-## Development Workflow
-
-### Getting Started
-```bash
-# Install dependencies
-npm install
-
-# Start dev server (localhost:3000)
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-```
-
-### Environment Setup
-1. Copy `.env.example` to `.env`
-2. (Optional) Add `VITE_API_KEY=your_gemini_key` for AI commentary
-3. Game works without API key (uses fallback commentary)
-
-### Development Server
-- **Port**: 3000 (configured in `vite.config.ts`)
-- **Host**: 0.0.0.0 (accessible from network)
-- **HMR**: Fast Refresh enabled via `@vitejs/plugin-react`
-
-### Path Aliases
-Configured in `tsconfig.json` and `vite.config.ts`:
-- `@/*` → Root directory
-- Example: `import { GameContext } from '@/context/GameContext'`
-
----
-
-## Code Conventions
-
-### TypeScript
-- **Strict mode**: Partial (no `strict` flag, but isolated modules enabled)
-- **Target**: ES2022
-- **Module**: ESNext
-- **JSX**: `react-jsx` (automatic runtime)
-
-### File Naming
-- **Components**: PascalCase `.tsx` (e.g., `Dashboard.tsx`)
-- **Utils**: camelCase `.ts` (e.g., `simulationUtils.ts`)
-- **Types**: `types.ts` (singular)
-- **Constants**: `constants.ts` (singular)
-
-### Component Structure
-```tsx
-// 1. Imports
-import React from 'react';
-import { useGameContext } from '@/context/GameContext';
-
-// 2. Interfaces (if needed)
-interface Props {
-  // ...
+**When adding new `PlayerProfile` fields, always add a migration block in `loadGame()`:**
+```typescript
+if (data.player.newField === undefined) {
+    data.player.newField = defaultValue;
 }
-
-// 3. Component
-export const ComponentName: React.FC<Props> = ({ props }) => {
-  // 4. Hooks
-  const { player, setPlayer } = useGameContext();
-  const [localState, setLocalState] = useState();
-
-  // 5. Event Handlers
-  const handleAction = () => {
-    // ...
-  };
-
-  // 6. Render
-  return (
-    <div>
-      {/* ... */}
-    </div>
-  );
-};
 ```
+Existing migration blocks already cover: `energy`, `wallet`, `lifetimeEarnings`, `itemsPurchased`, `currentYear`, `seasonsPlayed`, `careerHistory`, `mediaReputation`, `teammates`/`teamChemistry`, `coachingStaff`, `activeCareerEvents`/`careerEventHistory`.
 
-### Styling
-- **Tailwind CSS**: Utility classes in JSX
-- **No CSS modules**: All styles inline via Tailwind
-- **Responsive**: Mobile-first approach (game is mobile-first per metadata.json)
+---
 
-### State Updates
-Always use functional updates for context state:
+## 7. Services layer (v1.4 additions)
+
+### `services/storageService.ts` — ACTIVE
+Routes save/load to `@capacitor/preferences` on native, `localStorage` on web. GameContext should use this for new storage operations rather than calling `localStorage` directly.
+
+### `services/iapService.ts` — STUBBED, DISABLED
+RevenueCat IAP. **Disabled due to `NSIndexPath` crashes in development.**
+- All methods return safe mock values
+- `PRODUCT_MAP` is defined and ready (energy items, `remove_ads`, `season_pass`, coin packs)
+- `@revenuecat/purchases-capacitor` is **not in package.json** — do not install it unless explicitly instructed
+- Re-enabling: install package, uncomment `Purchases` imports, test on real device only
+
+### `services/adService.ts` — STUBBED, DISABLED
+AdMob rewarded ads. **Disabled due to `EXC_BAD_ACCESS` crashes in development.**
+- `showRewardedAd()` always returns `true` in dev (player always gets the reward)
+- `@capacitor-community/admob` is **not in package.json** — do not install it
+- Re-enabling: install package, uncomment `AdMob` imports, test on real device only
+
+### `services/hapticsService.ts` / `notificationService.ts` / `audioService.ts` — ACTIVE
+All wrap Capacitor APIs with native/web guards. Safe to call — no-ops on web.
+
+### `services/geminiService.ts` — ACTIVE (optional)
+Gemini AI commentary. Works without `GEMINI_API_KEY` — falls back to template commentary.
+
+---
+
+## 8. Known bugs (as of v1.4)
+
+Fix only what you are explicitly assigned. Do not touch these as side effects of other work.
+
+| # | File | Line (approx.) | Bug | Severity |
+|---|------|----------------|-----|----------|
+| 1 | `GameContext.tsx` | ~1175 | Captaincy eligibility reads `teamChemistry?.state` — field doesn't exist on `TeamChemistry`. Should be `teamChemistry?.recentForm`. Captaincy offers **never fire**. | Medium |
+| 2 | `GameContext.tsx` | ~920 | Rehab physio bonus: `coachingStaff?.staffMembers?.some(...)` — `staffMembers` not in `CoachingStaff` interface. Should be `coachingStaff.medicalStaff`. Physio bonus **never applies**. | Medium |
+| 3 | `GameContext.tsx` | `useCaptainSpeech` | Sets `motivationBoost: 15` but never sets `motivationExpiry`. Boost **never expires**. | Low |
+| 4 | `GameContext.tsx` | `advanceRound` | `generateFanMailEvent` called in **two separate `setPlayer` blocks** — can generate duplicate fan mail in the same round. Do not add a third call. | Low |
+| 5 | `GameContext.tsx` | `advanceRound` | `legacyScore` recalculated twice per round — second write wins, no data loss. | Low |
+| 6 | `types.ts` | `PlayerProfile` | `retireAtSeasonEnd` set via `(extra as any).retireAtSeasonEnd` — untyped. Should be added as `retireAtSeasonEnd?: boolean` to `PlayerProfile`. | Low |
+| 7 | `CoachingStaff.tsx` | — | `hireCoachingStaff` context action typed as `(staffMember: any, contractType)` — needs proper `StaffMember` typing. | Low |
+| 8 | Display components | `PlayerStats.tsx` + others | Some components may still read legacy `bio` string. Correct pattern: `biography?.[biography.length-1] ?? bio`. | Low |
+
+---
+
+## 9. v1.5 — Next version targets
+
+v1.5 activates the monetisation layer stubbed in v1.4, and prepares for App Store submission.
+
+### Priority goals
+1. **Activate IAP** — install `@revenuecat/purchases-capacitor`, wire `iapService.ts` into `GameContext.purchaseItem()`, test against App Store sandbox
+2. **Activate rewarded ads** — install `@capacitor-community/admob`, wire `adService.ts` into the energy refill flow, test on real device
+3. **Sign In with Apple** — required for App Store if any third-party auth exists; install `@capacitor/sign-in-with-apple`, enable capability in Xcode under Signing & Capabilities
+4. **Cloud save (optional)** — Firebase Firestore sync so saves persist across reinstalls; `storageService.ts` is the integration point
+5. **App Store submission prep** — screenshots, metadata, privacy policy, age rating
+6. **Bug fixes** — bugs #1 (captaincy) and #2 (physio) above are the highest-value fixes for v1.5
+
+### What must not change in v1.5
+- `simulationUtils.ts` and `seasonUtils.ts` — match sim and season logic is stable, don't touch
+- Existing career event types — additive only, never remove from the `CareerEvent.type` union
+- `PlayerProfile` existing fields — never remove or rename; only add new optional (`?`) fields
+- `SAVE_KEY` format — any change requires a migration path for existing slots
+- `SEASON_LENGTH` — any change requires updating all `SEASON_LENGTH + 1` / `SEASON_LENGTH + 2` finals logic in `GameContext.tsx`
+
+---
+
+## 10. Non-negotiable rules
+
+1. **Zero TypeScript errors.** `npm run build` must complete clean. Fix all errors before finishing.
+2. **Never remove a field from `PlayerProfile`.** Saves will break for existing users.
+3. **Always add a migration block in `loadGame()` for every new `PlayerProfile` field.**
+4. **`ios/` is Capacitor-generated — never edit it directly.**
+5. **Do not install new npm packages without confirming with the project owner.**
+6. **Do not re-enable `iapService` or `adService` unless explicitly instructed.** Both are disabled for good reason.
+7. **Do not add a third `generateFanMailEvent` call in `advanceRound`.** It already fires twice.
+8. **Do not write `teamChemistry?.state`.** The correct field is `teamChemistry.recentForm`.
+9. **Add new game logic to util files**, not inline in `GameContext.tsx` — it is already ~2200 lines.
+10. **No sub-agents.** Complete one task at a time. Ask before moving on.
+11. **Read before writing.** Always read a file before editing it.
+12. **Mobile-first UI.** All new UI must work at 375px+ width. Use Tailwind responsive classes.
+13. **Dark theme only.** Background `bg-gray-900`, surfaces `bg-gray-800`, cards `bg-gray-800 rounded-xl border border-gray-700`. No `dark:` variant classes.
+14. **Do not add a backend, database, or auth system** without explicit instruction — client-only by design.
+
+---
+
+## 11. Key patterns
+
+### State updates — always use functional form
 ```typescript
 // ✅ GOOD
-setPlayer(prev => ({
-  ...prev,
-  energy: prev.energy - 10
-}));
+setPlayer(prev => ({ ...prev, energy: prev.energy - 10 }));
 
-// ❌ BAD (potential stale state)
-setPlayer({
-  ...player,
-  energy: player.energy - 10
-});
+// ❌ BAD — stale state risk
+setPlayer({ ...player, energy: player.energy - 10 });
+```
+
+### Adding a new PlayerProfile field
+```typescript
+// 1. types.ts — always optional
+newField?: SomeType;
+
+// 2. GameContext.tsx loadGame() migration
+if (data.player.newField === undefined) {
+    data.player.newField = defaultValue;
+}
+```
+
+### Inspect save data in browser devtools
+```javascript
+JSON.parse(localStorage.getItem('footyLegendSave_slot0'))
+```
+
+### Reading large files in chunks
+`GameContext.tsx` is ~2200 lines. `constants.ts` is ~1723 lines. Always chunk:
+```
+read_file path="context/GameContext.tsx" length=300 offset=0
+read_file path="context/GameContext.tsx" length=300 offset=300
 ```
 
 ---
@@ -467,315 +453,32 @@ setPlayer({
 
 ---
 
-## State Management
+## 12. Quick reference — critical constants
 
-### GameContext API
-
-#### State Properties
-```typescript
-{
-  player: PlayerProfile | null,          // Current player data
-  league: Team[],                        // All teams in current league
-  fixtures: Fixture[],                   // Match schedule
-  currentRound: number,                  // Current round (1-14 regular season)
-  view: ViewType,                        // Current screen (22 possible values)
-  lastMatchResult: MatchResult | null,   // Most recent match result
-  showSeasonRecap: boolean,              // Show recap modal
-  seasonAwards: Award[],                 // Current season's award results
-  draftClass: DraftClass | null,         // Active draft class
-  showFinalsIntro: boolean,              // Finals intro modal flag
-  showSemiFinalsResults: boolean,        // Semi-finals results modal flag
-  showGrandFinalResult: boolean,         // Grand Final result modal flag
-}
-```
-
-#### Key Functions
-```typescript
-// Game Lifecycle
-startNewGame(profile: PlayerProfile): void
-resetGame(): void                        // Wipe save data
-saveGame(): void                         // Manual save
-loadGame(): boolean                      // Load from localStorage
-retirePlayer(): void                     // End career
-
-// Match Flow
-generateMatchSimulation(fixtureIndex: number): MatchResult
-commitMatchResult(fixtureIndex: number, result: MatchResult): void
-advanceRound(): void                     // Progress to next round
-simulateRound(): void                    // Skip round (if injured)
-
-// Training
-trainAttribute(attr: keyof PlayerProfile['attributes']): void
-
-// Daily Rewards
-canClaimReward(): boolean
-claimReward(): void
-
-// Draft
-draftProspect(prospectId: string): void
-simulateDraft(): void
-completeDraft(): void
-
-// Transfer Market
-acceptTransfer(offerId: string): void
-rejectTransfer(offerId: string): void
-
-// Shop
-purchaseItem(itemId: string): boolean
-
-// Media
-respondToMedia?(eventId: string, responseType: 'HUMBLE' | 'CONFIDENT' | 'IGNORE'): void
-createSocialPost?(content: string): void
-
-// Career Events
-resolveEvent(eventId: string): void
-resolveEventChoice(eventId: string, choiceId?: string): void  // choiceId required for choice events
-
-// Coaching
-hireCoachingStaff?(staffMember: any, contractType: 'PERMANENT' | 'TEMPORARY'): void
-
-// Finals
-dismissFinalsIntro(): void
-dismissSemiFinalsResults(): void
-dismissGrandFinalResult(): void
-
-// Awards
-dismissAwardsCeremony(): void
-
-// UI
-setView(view: ViewType): void
-dismissSeasonRecap(): void
-acknowledgeMilestone(): void
-```
-
-### LocalStorage Schema
-```javascript
-// Key: 'footyLegendSave'   ← NOTE: NOT 'footySaveData'
-{
-  player: PlayerProfile,
-  league: Team[],
-  fixtures: Fixture[],
-  currentRound: number
-}
-```
-
-### PlayerProfile — Key Field Groups
-```typescript
-// Basic
-name, gender, position, subPosition, age, potential, avatar, contract
-
-// Attributes
-attributes: { kicking, handball, tackling, marking, speed, stamina, goalSense }
-
-// Progression
-xp, level, skillPoints, energy, morale, injury
-seasonStats, careerStats, milestones, currentYear, seasonsPlayed, careerHistory
-
-// Achievements & Rewards
-achievements: UnlockedAchievement[]
-dailyRewards, nickname, jerseyNumber
-
-// Economy
-wallet, lifetimeEarnings, itemsPurchased[]
-
-// Transfer
-transferOffers: TransferOffer[]
-
-// Media
-mediaReputation: MediaReputation   // { score, tier, followers, events[] }
-
-// Career Events
-activeCareerEvents: CareerEvent[]
-careerEventHistory: CareerEventHistory[]
-
-// Chemistry
-teammates: TeammateRelationship[]
-teamChemistry: TeamChemistry
-chemistryEvents: ChemistryEvent[]
-
-// Coaching
-coachingStaff: CoachingStaff
-coachingEvents: CoachingEvent[]
-motivationBoost, motivationExpiry
-
-// Master Skills
-masterSkills: UnlockedMasterSkill[]
-```
+| Constant / value | Where |
+|-----------------|-------|
+| `SEASON_LENGTH = 14` | `constants.ts` |
+| `STARTING_AGE = 18` | `constants.ts` |
+| `RETIREMENT_AGE = 35` | `constants.ts` |
+| `INITIAL_ATTRIBUTE_POINTS = 15` | `constants.ts` |
+| `MAX_ATTRIBUTE_LEVEL = 99` | `constants.ts` |
+| Save key: `footyLegendSave_slot{0\|1\|2}` | `services/storageService.ts` |
+| App ID: `com.aflstars.game` | `capacitor.config.ts` |
+| Dev server port: `3000` | `vite.config.ts` |
+| Finals: `SEASON_LENGTH + 1` semis, `SEASON_LENGTH + 2` GF | `GameContext.tsx` |
 
 ---
 
-## Common Tasks
+## 13. Deeper references
 
-### Debugging Match Simulation
-```typescript
-// 1. Open utils/simulationUtils.ts
-// 2. Find calculateMatchOutcome()
-// 3. Add console.logs to track events
-console.log('Match Event:', event);
-console.log('Player Stats:', result.playerStats);
-```
+For full detail on every system, util function, component, data flow, and bug location, read:
 
-### Adjusting Difficulty
-```typescript
-// constants.ts
-export const INITIAL_ATTRIBUTE_POINTS = 15; // Increase for easier start
-
-// utils/simulationUtils.ts
-const opponentTeamRating = calculateTeamRating(opponentTeam) * 0.9; // 10% nerf
-```
-
-### Adding New Team Names
-```typescript
-// constants.ts
-export const TEAM_NAMES_LOCAL = ["Mudcrabs", "Bushrangers", /* ... */, "New Team"];
-export const TEAM_NAMES_STATE = ["Wildcats", "Scorpions", /* ... */, "New Team"];
-export const TEAM_NAMES_AFL   = ["Collingwood", "Carlton", /* ... */, "New Team"];
-```
-
-### Modifying Season Length
-```typescript
-// constants.ts
-export const SEASON_LENGTH = 14; // Change to desired rounds
-// Finals logic in GameContext.tsx assumes 14-round season — update accordingly
-```
-
-### Testing AI Commentary
-```typescript
-// 1. Add .env file with VITE_API_KEY
-// 2. services/geminiService.ts will be used automatically
-// 3. Check console for API errors — fallback commentary used if API fails
-```
-
-### Inspecting Save Data
-```javascript
-// Browser console
-JSON.parse(localStorage.getItem('footyLegendSave'))
-```
+- **`AGENTS.md`** — 715-line technical deep-dive; supersedes this file on implementation specifics
+- **`Feature Specs/AFL_FootyStars_v1.3_Spec.md`** — v1.3 feature specification
+- **`Feature Specs/AFL_FootyStars_v1.3.1_UI_Spec.md`** — v1.3.1 UI polish specification
+- **`_prompts/README.md`** — sub-agent prompt file index and merge order
 
 ---
 
-## Important Files Reference
-
-### Critical Files (Modify with Care)
-| File | Purpose | Caution |
-|---|---|---|
-| `context/GameContext.tsx` | Core game state & logic (~3000 lines) | Breaking changes affect entire app |
-| `types.ts` | Type definitions | Changes ripple through codebase |
-| `utils/simulationUtils.ts` | Match engine | Complex logic, test thoroughly |
-| `constants.ts` | Game configuration (~1275 lines) | Balance-sensitive data |
-
-### Safe to Modify
-| File | Purpose | Notes |
-|---|---|---|
-| `components/*.tsx` | UI components | Mostly presentation, safe to edit |
-| `utils/achievementUtils.ts` | Achievement logic | Self-contained |
-| `utils/nicknameUtils.ts` | Nickname generation | Self-contained |
-| `utils/mediaUtils.ts` | Media/reputation events | Self-contained |
-| `utils/careerEventUtils.ts` | Career event logic | Self-contained |
-| `README.md` | User documentation | Safe to update |
-
-### Configuration Files
-| File | Purpose |
-|---|---|
-| `vite.config.ts` | Build configuration, dev server settings |
-| `tsconfig.json` | TypeScript compiler options |
-| `package.json` | Dependencies, scripts |
-| `.env` | Environment variables (API keys) |
-
-### Entry Points
-| File | Purpose |
-|---|---|
-| `index.html` | HTML template |
-| `index.tsx` | React app mount point |
-| `App.tsx` | Root component, view router |
-
----
-
-## AI Assistant Guidelines
-
-### When Modifying Code
-1. **Always read existing files first** before making changes
-2. **Preserve game balance** — don't make player too powerful
-3. **Maintain TypeScript types** — update `types.ts` if adding properties
-4. **Follow existing patterns** — match component structure
-5. **Test match simulation** — changes to `simulationUtils.ts` need testing
-6. **Update constants.ts** — for new achievements, teams, milestones, shop items
-7. **Don't break saves** — avoid removing required fields from `PlayerProfile`
-8. **GameContext is large** — when adding new systems, consider adding dedicated utility functions rather than inline logic
-
-### When Adding Features
-1. Check if similar features exist (e.g., achievements, career events)
-2. Reuse existing utilities where possible
-3. Add TypeScript types before implementation
-4. Update `GameContext` only if state/actions needed
-5. Consider mobile-first design (game is mobile-optimized)
-
-### When Debugging
-1. Check browser console for errors
-2. Inspect `localStorage` with key `'footyLegendSave'` for save data
-3. Verify TypeScript compilation (`npm run build`)
-4. Test without API key (fallback paths)
-
-### Red Flags to Avoid
-- ❌ Removing fields from `PlayerProfile` without migration logic
-- ❌ Changing `SEASON_LENGTH` without updating finals logic
-- ❌ Modifying `types.ts` without updating all usages
-- ❌ Breaking LocalStorage schema compatibility (key: `'footyLegendSave'`)
-- ❌ Removing required props from components
-- ❌ Adding inline game logic to GameContext when a utils function would do
-
----
-
-## Known Issues & TODOs
-
-### Open TODOs
-None currently.
-
-### Recently Fixed
-| Issue | Fix |
-|---|---|
-| AFL draft picks used incorrect team names (e.g., "Collingwood FC") | Fixed in `utils/leagueUtils.ts` — NATIONAL tier teams now use bare names matching `TEAM_NAMES_AFL` |
-| `resolveEventChoice` interface was missing `choiceId` parameter | Fixed — signature is now `(eventId: string, choiceId?: string): void` |
-
----
-
-## Version History
-
-- **1.1.0.0** (Current) — Phase 3-4 Feature Integration
-  - Fan Mail & Supporter Interaction (career event system)
-  - Club Culture & Fan Base Personality (media frequency, crowd flavour, BIG_CITY bonus)
-  - Rivalry System Expansion (head-to-head tracking, history, intensity escalation, resolution)
-  - Training Mini-Games (Kick, Reaction, Strength drills for SP bonuses)
-  - Club History & Record Books (generateClubHistory, Record Watch banner)
-  - AFLW Women's League Path (gender selector, parallel team names, AFLW award names)
-
-- **1.0.0.0 Beta1** — Major feature-complete beta
-  - Full finals system (semi-finals + Grand Final screens)
-  - Draft, Transfer Market, Shop systems
-  - Media Hub, Team Chemistry, Coaching Staff
-  - Career Events, Master Skill Tree
-  - Awards Ceremony (9 award types)
-  - Post-Match Press Conference
-  - 70+ achievements, 30+ career events, 30+ master skills
-
-- **0.8.0.0** — Major Update #2
-  - Significant gameplay systems expansion
-
-- **0.0.1.0_Gamma** — Initial feature-complete version
-  - 7 Quick Wins features implemented
-  - Achievement system, daily rewards, nicknames
-  - Jersey numbers, player comparison, milestones gallery, season recap
-
----
-
-## Contact & Contribution
-
-This is a **private project** (per README.md).
-- No public contributions accepted
-- Feedback/suggestions welcome through project owner
-
----
-
-**Last Updated**: 2026-04-14
-**Generated for**: Claude AI Assistant
-**Repository**: AFL_Footy_Stars
+*AFL Footy Stars — CLAUDE.md*
+*Last updated: April 2026 | v1.4 current | VoidbreakDev / Ryan Sinclair*

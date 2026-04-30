@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Build artifacts
+dist/
+
 # OS files
 .DS_Store
 **/.DS_Store
@@ -12,6 +15,19 @@ node_modules/
 
 # Claude Code internals
 .claude/
+.kilo/
+.vibe/
+.vscode/
+
+# Skills
+_skills/
+
+# Mobile builds
+android/
+ios/
+
+# Docs (internal)
+docs/superpowers/
 
 # Misc
 node_modules/@esbuild/darwin-arm64/bin/esbuild 2
