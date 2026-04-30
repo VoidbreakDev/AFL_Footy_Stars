@@ -18,7 +18,7 @@
 | Field | Value |
 |-------|-------|
 | Name | AFL Footy Stars |
-| Version | **1.1.0.0** |
+| Version | **v1.5.2** |
 | Type | React SPA — no router, no backend, no auth |
 | Runtime | Browser only — Vite dev server on `localhost:3000` |
 | Persistence | `localStorage` only |
@@ -61,13 +61,13 @@ AFL_Footy_Stars/
 ├── App.tsx                  # Root — renders GameProvider + view switch
 ├── index.tsx                # ReactDOM.createRoot mount point
 ├── index.html               # HTML shell
-├── types.ts                 # ALL interfaces & enums (~700 lines) ← read first
+├── types.ts                 # ALL interfaces & enums (~975 lines) ← read first
 ├── constants.ts             # ALL game data & config (~1723 lines) ← read second
 ├── vite.config.ts           # Port 3000, host 0.0.0.0, @/ alias, env injection
 ├── context/
 │   └── GameContext.tsx      # Single source of all game state & actions (~2200 lines)
-├── components/              # 37 React UI components (see Section 10)
-├── utils/                   # 19 pure business-logic files (see Section 7)
+├── components/              # 39 React UI components (see Section 10)
+├── utils/                   # 20 pure business-logic files (see Section 7)
 ├── services/
 │   └── geminiService.ts     # Gemini AI commentary wrapper
 └── _prompts/                # Sub-agent feature prompts (v1.1 roadmap)
@@ -692,21 +692,68 @@ seasonEnded = (currentRound === SEASON_LENGTH + 2)
 
 ## 14. Known bugs & active issues
 
+### Fixed in v1.5
+
+| Location | Issue | Status |
+|----------|-------|--------|
+| `GameContext.tsx` ~line 1172 | Captaincy eligibility read `teamChemistry?.state` — field doesn't exist | **FIXED** — now reads `teamChemistry?.recentForm` |
+| `GameContext.tsx` ~line 920 | Rehab physio check: `coachingStaff?.staffMembers?.some(s => s.role === 'PHYSIO')` — `staffMembers` not in `CoachingStaff` interface | **FIXED** — `staffMembers?: StaffMember[]` added to `CoachingStaff` interface as backward-compat field |
+| `GameContext.tsx` ~line 308 | `useCaptainSpeech` sets `motivationBoost: 15` but does not set `motivationExpiry` — boost never expires | **FIXED** — now sets `motivationExpiry: Date.now() + 7 days` |
+| `GameContext.tsx` `advanceRound` | `generateFanMailEvent` called in two separate `setPlayer` blocks — duplicate fan mail events in the same round | **FIXED** — only one `generateFanMailEvent` call remains (line 1197); the second block uses the separate `generateFanMail` function |
+| `types.ts` / `GameContext.tsx` | `retireAtSeasonEnd` field set as `(extra as any).retireAtSeasonEnd` — untyped, not in `types.ts` | **FIXED** — `retireAtSeasonEnd?: boolean` added to `PlayerProfile` interface |
+
+### Remaining issues
+
 | Location | Issue | Severity |
 |----------|-------|----------|
-| `GameContext.tsx` ~line 1175 | Captaincy eligibility reads `teamChemistry?.state` — field doesn't exist, should be `teamChemistry?.recentForm` | Medium — captaincy offers never fire |
-| `GameContext.tsx` ~line 920 | Rehab physio check: `coachingStaff?.staffMembers?.some(s => s.role === 'PHYSIO')` — `staffMembers` not in `CoachingStaff` interface; should use `medicalStaff` | Medium — physio bonus never applies |
-| `GameContext.tsx` ~line 310 | `useCaptainSpeech` sets `motivationBoost: 15` but does not set `motivationExpiry` — boost never expires | Low — minor balance issue |
-| `GameContext.tsx` `advanceRound` | `generateFanMailEvent` called in two separate `setPlayer` blocks — can generate duplicate fan mail events in the same round | Low |
-| `GameContext.tsx` `advanceRound` | `legacyScore` recalculated twice per round (once in main block via `applyAgingEffects` result, once in story arc block) — second write wins | Low — no data loss |
-| `PlayerProfile` | `retireAtSeasonEnd` field set as `(extra as any).retireAtSeasonEnd` — untyped, not in `types.ts` | Low — add as `retireAtSeasonEnd?: boolean` to `PlayerProfile` |
-| `components/CoachingStaff.tsx` | `hireCoachingStaff` context action is typed as `(staffMember: any, contractType)` — needs proper `StaffMember` typing | Low |
-| General | `biography[]` dynamic bio system exists but some display components may still read static `bio` string | Low — add `biography?.[biography.length-1] ?? bio` fallback pattern |
-| `PlayerProfile` | `motivationExpiry` not set in `useCaptainSpeech` — see bug above | Low |
+| `GameContext.tsx` `advanceRound` | `legacyScore` recalculated twice per round (once in main block via `applyAgingEffects`, once in story arc block) — second write wins | Low — no data loss |
+| `components/CoachingStaff.tsx` | `hireCoachingStaff` context action typed as `(staffMember: any, contractType)` — needs proper `StaffMember` typing | Low |
+| General | `biography[]` dynamic bio system exists but some display components may still read static `bio` string | Low — use `biography?.[biography.length-1] ?? bio` fallback |
 
 ---
 
-## 15. AFL domain knowledge
+## 15. v1.5.x completed features
+
+### v1.5 — Deep Match Simulation Engine
+- Fatigue decay model: per-quarter performance multiplier based on starting energy and personality
+- Personality modifiers: PROFESSIONAL (consistency), FLAIR (variance), WARRIOR (tackling/big-game), LEADER (pressure), ENIGMA (extreme variance)
+- Match-day pressure system: pressure levels 0–3 (normal → extreme), modulated by personality
+- Team battle engine: contested possession, zone defence, chemistry synergy — all feed into scoring probability
+- `matchEngineUtils.ts`: `buildMatchContext()`, `generateBattleReport()`, `contestedPossessionBattle()`, `zoneDefenceBattle()`, `synergyMultiplier()`
+- Contextual phrase selection: `selectContextualPhrase()` picks comeback/blowout/finals tension/late pressure based on score diff, momentum, and quarter
+- Chain event generation: kick-to-goal, tackle-turnover, ruck-clearance, intercept-forward sequences
+- Rivalry commentary: Q1 buildup and Q4 resolution phrases tied to rivalry intensity
+- Synergy commentary: positive (BEST_MATE) and negative (ENEMY/RIVAL) teammate interaction events
+- Rating-aware goal threshold: replaces fixed 0.25 with dynamic calculation from team rating differential
+- Momentum system: tracks consecutive scores per side, affects next-quarter scoring probability
+- MatchResult extended: `matchContext`, `battleReport`, `topPerformers`, `highlights`, `energyUsed`, `tactic`
+- 14+ phrase pools with 12 entries each; culture-aware crowd phrases by club type
+
+### v1.5.1 — Commentary & Event Narration
+- Per-type display delays in MatchSim.tsx: GOAL (2.3s), INJURY (2.7s), RIVALRY (2.1s), BEHIND (1.7s), MARK (1.6s), etc.
+- Timeout-based event scheduling replacing fixed-interval approach
+- Dangling timeout cleanup on navigation (unmount + view-change guards)
+- Chain connector lines between close consecutive player-involved events
+- 9 new filler pools: STOPPAGE, RUCK_CONTEST, DEFENSIVE_PRESSURE, FORWARD_PRESSURE, MIDFIELD_BATTLE, CONDITIONS, ATMOSPHERE, UMPIRE, BRILLIANCE
+
+### v1.5.2 — Expanded Filler Events
+- Target 18–24 events per quarter (up from 12–15)
+- Expanded all existing phrase pools to 12+ entries each
+- Chain template pools expanded from 3–4 to 12 entries each (kick-to-goal, handball-goal, tackle-turnover, ruck-clearance, intercept-forward, synergy positive/negative)
+- Gemini commentary generation with fallback text on API failure
+- Skip-commentary safety button on loading screen
+- Season-end safety timeout (10s) to prevent stuck loading state
+
+### v1.5 Bug fixes
+- Captaincy eligibility: `teamChemistry?.state` → `teamChemistry?.recentForm`
+- `CoachingStaff` interface: added `staffMembers?: StaffMember[]` backward-compat field
+- Captain speech motivation: `motivationExpiry` now set to 7-day window
+- Fan mail deduplication: single `generateFanMailEvent` call per round
+- `retireAtSeasonEnd` typed in `PlayerProfile` interface
+
+---
+
+## 16. AFL domain knowledge
 
 - **Scoring:** Goal (through tall posts) = 6 pts. Behind (outer posts or touched off boot) = 1 pt. Score written `Goals.Behinds.Total` e.g. `12.8.80`
 - **Disposals** = kicks + handballs — the primary midfield counting stat
@@ -725,7 +772,7 @@ seasonEnded = (currentRound === SEASON_LENGTH + 2)
 
 ---
 
-## 16. Known Gotchas
+## 17. Known Gotchas
  - **CSS GOTCHA** — Stacking context breaks fixed overlays:
 Any transform value other than `none` on an ancestor element creates a new 
 containing block for position: fixed descendants. After animation completes, 

@@ -306,6 +306,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               captainSpeechUsed: true,
               morale: Math.min(100, (prev.morale ?? 0) + 15),
               motivationBoost: 15,
+              motivationExpiry: Date.now() + (7 * 24 * 60 * 60 * 1000),
               teammates: updatedTeammates,
           };
       });
@@ -1169,8 +1170,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Captaincy eligibility check at season start
           let captainOfferAdded = false;
           if (seasonEnded && !prev.isCaptain && (prev.seasonsPlayed ?? 0) >= 3) {
-              const chemState = prev.teamChemistry?.state;
-              if ((chemState === 'HOT' || chemState === 'WARM') && !captainOfferAdded) {
+               const chemState = prev.teamChemistry?.recentForm;
+               if ((chemState === 'HOT' || chemState === 'WARM') && !captainOfferAdded) {
                   captainOfferAdded = true;
                   const captainEvent: any = {
                       id: `captain-offer-${newCurrentYear}`,
@@ -1207,8 +1208,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           let updatedLowChemStreak = prev.lowChemistryStreak ?? 0;
           let updatedIsCaptain = prev.isCaptain ?? false;
           if (updatedIsCaptain) {
-              const chemState = prev.teamChemistry?.state;
-              if (chemState === 'FREEZING' || chemState === 'COLD') {
+               const chemState = prev.teamChemistry?.recentForm;
+               if (chemState === 'FREEZING' || chemState === 'COLD') {
                   updatedLowChemStreak += 1;
                   if (updatedLowChemStreak >= 3) {
                       updatedIsCaptain = false;
